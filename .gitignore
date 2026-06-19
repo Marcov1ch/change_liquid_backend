@@ -1,5 +1,59 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# База данных
 *.db
 *.sqlite
 *.sqlite3
-*.sqlite3-journal
+*.db-journal
 /data/
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Переменные окружения
+.env
+.env.local
+.env.*.local
+
+# Docker
+*.pid
+docker-compose.override.yml
+
+# Логи
+logs/
+*.log
+
+# Poetry
+poetry.lock  # если хочешь, чтобы все использовали одинаковые версии - убери эту строку
+
+# Фронтенд
+node_modules/
+dist/
+build/
+*.tsbuildinfo
