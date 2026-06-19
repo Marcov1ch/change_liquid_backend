@@ -6,7 +6,7 @@ from app.db.database import init_db
 
 
 def create_app() -> FastAPI:
-    """Создание приложения."""
+    """Создание приложения ."""
 
     init_db()
 
