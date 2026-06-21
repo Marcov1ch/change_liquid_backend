@@ -8,5 +8,6 @@ services:
     volumes:
       - ./data:/data  # папка для БД на хосте
     environment:
-      - DATABASE_PATH=/data/app.db  # путь к БД внутри контейнера
+      - DATABASE_PATH=./data/app.db  # путь к БД внутри контейнера
+      - SECRET_KEY=${SECRET_KEY}
     restart: always

@@ -84,3 +84,18 @@ class VehicleRepository:
             self.db.commit()
             return True
         return False
+
+    def find_active_by_owner(self, user_id: int) -> list[Vehicle]:
+        """Найти активные авто владельца."""
+        db_vehicles = self.db.query(VehicleDB).filter(
+            VehicleDB.owner_id == user_id,
+            VehicleDB.is_active
+        ).all()
+        return [Vehicle(**v.__dict__) for v in db_vehicles]
+
+    def find_by_owner(self, user_id: int) -> list[Vehicle]:
+        """Найти все авто владельца."""
+        db_vehicles = self.db.query(VehicleDB).filter(
+            VehicleDB.owner_id == user_id
+        ).all()
+        return [Vehicle(**v.__dict__) for v in db_vehicles]
