@@ -14,6 +14,7 @@ class VehicleService:
 
     def create(
         self,
+        user_id: int,
         vehicle_data: VehicleBase,
     ) -> VehicleDTO:
         """Создать авто."""
@@ -30,6 +31,7 @@ class VehicleService:
             coolant_interval_km=vehicle_data.coolant_interval_km,
             power_steering_interval_km=vehicle_data.power_steering_interval_km,
             differential_oil_interval_km=vehicle_data.differential_oil_interval_km,
+            owner_id=user_id,
             is_active=True,
         )
         saved = self.repository.save(vehicle)
@@ -102,6 +104,16 @@ class VehicleService:
         """Полностью удалить автомобиль из БД."""
         return self.repository.hard_delete(vehicle_id)  # type: ignore[no-any-return]
 
+    def get_all_active_by_owner(self, user_id: int) -> list[VehicleDTO]:
+        """Получить активные авто только для пользователя."""
+        vehicles = self.repository.find_active_by_owner(user_id)
+        return [self._to_dto(v) for v in vehicles]
+
+    def get_all_vehicles_by_owner(self, user_id: int) -> list[VehicleDTO]:
+        """Получить все авто пользователя (включая удалённые)."""
+        vehicles = self.repository.find_by_owner(user_id)
+        return [self._to_dto(v) for v in vehicles]
+
     def _to_dto(self, vehicle: Vehicle) -> VehicleDTO:
         return VehicleDTO(
             id=vehicle.id,
@@ -111,6 +123,7 @@ class VehicleService:
             year=vehicle.year,
             current_km=vehicle.current_km,
             is_active=vehicle.is_active,
+            owner_id=vehicle.owner_id,
             oil_interval_km=vehicle.oil_interval_km,
             transmission_interval_km=vehicle.transmission_interval_km,
             brake_interval_km=vehicle.brake_interval_km,

@@ -1,12 +1,16 @@
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.api.routes import setup_routes
 from app.db.database import init_db
+from app.auth.handler import router as auth_router
 
 
 def create_app() -> FastAPI:
     """Создание приложения ."""
+
+    load_dotenv()
 
     init_db()
 
@@ -16,6 +20,8 @@ def create_app() -> FastAPI:
         description='Приложение для учета замены жидкостей',
         debug=False,
     )
+
+    app.include_router(auth_router)
 
     setup_routes(app)
 

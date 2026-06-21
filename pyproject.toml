@@ -9,6 +9,12 @@ fastapi = "^0.135.2"
 sqlalchemy = "^2.0.49"
 aiosqlite = "^0.22.1"
 uvicorn = "^0.30.0"
+bcrypt = "^5.0.0"
+python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+email-validator = "^2.3.0"
+python-multipart = "^0.0.32"
+python-dotenv = "^1.0.0"
+alembic = "^1.18.4"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.19.1"

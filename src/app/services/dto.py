@@ -14,6 +14,7 @@ class VehicleDTO:
     year: int
     current_km: int
     is_active: bool
+    owner_id: int
     oil_interval_km: int
     transmission_interval_km: int
     brake_interval_km: int
