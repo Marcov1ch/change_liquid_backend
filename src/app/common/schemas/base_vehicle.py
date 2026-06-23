@@ -21,7 +21,7 @@ class VehicleBase(BaseModel):
     plate_number: str = Field(
         ...,
         description='Рег. номер',
-        examples=['А123АА198'],
+        examples=['А123АА178', '1234AB7'],
     )
     year: int = Field(
         ...,
@@ -40,18 +40,21 @@ class VehicleBase(BaseModel):
     @field_validator('plate_number')
     @classmethod
     def validate_plate_number(cls, v: str) -> str:
-        """Проверка формата госномера."""
-        allowed_letters = 'АВЕКМНОРСТУХ'
+        """Проверка формата госномера (РФ или РБ)."""
+        allowed_letters = 'АВЕІКМНОРСТУХ'
 
-        pattern = rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$'
+        patterns = [
+            rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',  # РФ: А123АА178
+            rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',                              # РБ тек.: 1234AB7
+            rf'^\d{{4}}[{allowed_letters}]{{2}}$',                                # РБ стар.: 1234AB
+        ]
 
-        cleaned = v.replace(' ', '').upper()
+        cleaned = v.replace(' ', '').replace('-', '').upper()
 
-        if not re.match(pattern, cleaned):
+        if not any(re.match(p, cleaned) for p in patterns):
             raise ValueError(
                 f'Некорректный формат госномера. '
-                f'Разрешённые буквы: {", ".join(allowed_letters)}. '
-                f'Пример: А123АА198'
+                f'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
             )
 
         return cleaned
