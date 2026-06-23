@@ -11,7 +11,7 @@ services:
     restart: always
 
   frontend:
-    build: ../car-frontend
+    build: ../change_liquid_frontend
     ports:
       - "80:80"
     depends_on:
