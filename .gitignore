@@ -59,3 +59,5 @@ build/
 *.tsbuildinfo
 
 /script/
+src/app/api/vehicle/__pycache__/handler.cpython-312.pyc
+src/app/common/schemas/__pycache__/base_vehicle.cpython-312.pyc

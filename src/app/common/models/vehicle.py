@@ -9,6 +9,10 @@ class Vehicle(VehicleBase, VehicleIntervals):
         None,
         description='id автомобиля',
     )
+    owner_id: int | None = Field(
+        None,
+        description='id владельца',
+    )
     is_active: bool = Field(
         True,
         description='Флаг активного автомобиля',
