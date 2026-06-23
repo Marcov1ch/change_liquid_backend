@@ -14,7 +14,16 @@ from app.auth.jwt import (
     refresh_access_token,
     get_current_user,
 )
-from app.auth.schemas import RefreshRequest, UserCreate, UserResponse, Token, RefreshTokenResponse
+from app.auth.schemas import (
+    RefreshRequest,
+    UserCreate,
+    UserResponse,
+    Token,
+    RefreshTokenResponse,
+    UpdateEmailRequest,
+    ChangePasswordRequest,
+    MessageResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -149,3 +158,71 @@ async def get_me(current_user: UserDB = Depends(get_current_user)) -> UserRespon
         is_active=current_user.is_active,
         created_at=current_user.created_at
     )
+
+
+@router.patch("/email", response_model=UserResponse)
+async def update_email(
+    request: UpdateEmailRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> UserResponse:
+    """Сменить email текущего пользователя."""
+    existing = db.query(UserDB).filter(
+        UserDB.email == request.email,
+        UserDB.id != current_user.id,
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already in use"
+        )
+
+    current_user.email = request.email
+    db.commit()
+    db.refresh(current_user)
+
+    return UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at
+    )
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    request: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> MessageResponse:
+    """Сменить пароль текущего пользователя."""
+    if not verify_password(request.old_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect password"
+        )
+
+    if request.old_password == request.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the old one"
+        )
+
+    current_user.hashed_password = hash_password(request.new_password)
+    db.commit()
+
+    return MessageResponse(detail="Password changed successfully")
+
+
+@router.delete("/me", response_model=MessageResponse)
+async def delete_account(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> MessageResponse:
+    """Деактивировать аккаунт (soft delete)."""
+    current_user.is_active = False
+    db.commit()
+
+    return MessageResponse(detail="Account deactivated")
