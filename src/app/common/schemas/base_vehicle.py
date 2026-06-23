@@ -51,7 +51,7 @@ class VehicleBase(BaseModel):
             raise ValueError(
                 f'Некорректный формат госномера. '
                 f'Разрешённые буквы: {", ".join(allowed_letters)}. '
-                f'Пример: А123АА178'
+                f'Пример: А123АА198'
             )
 
         return cleaned
