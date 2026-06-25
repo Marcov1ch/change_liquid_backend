@@ -19,5 +19,8 @@ lint:
 mypy:
 	poetry run mypy src
 
+test:
+	poetry run pytest src/tests -v
+
 ruff:
 	poetry run ruff check src
