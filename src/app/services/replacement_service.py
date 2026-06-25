@@ -37,7 +37,8 @@ class ReplacementService:
             request.liquid_type,
             request.km_at_replacement,
             request.replacement_date,
-        )  # type: ignore[call-arg]
+            exclude_id=None,
+        )
         self._update_vehicle_km_if_needed(
             vehicle,
             request.km_at_replacement,

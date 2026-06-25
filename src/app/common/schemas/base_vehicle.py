@@ -44,17 +44,17 @@ class VehicleBase(BaseModel):
         allowed_letters = 'АВЕІКМНОРСТУХ'
 
         patterns = [
-            rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',  # РФ: А123АА178
-            rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',                              # РБ тек.: 1234AB7
-            rf'^\d{{4}}[{allowed_letters}]{{2}}$',                                # РБ стар.: 1234AB
+            rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',
+            rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',
+            rf'^\d{{4}}[{allowed_letters}]{{2}}$',
         ]
 
         cleaned = v.replace(' ', '').replace('-', '').upper()
 
         if not any(re.match(p, cleaned) for p in patterns):
             raise ValueError(
-                f'Некорректный формат госномера. '
-                f'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
+                'Некорректный формат госномера. '
+                'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
             )
 
         return cleaned
