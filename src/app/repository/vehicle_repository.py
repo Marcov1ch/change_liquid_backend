@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
 
-from app.common.enums import BrandCar
 from app.db.models import VehicleDB
 from app.common.models.vehicle import Vehicle
 
@@ -16,8 +15,6 @@ class VehicleRepository:
             for k, v in db_vehicle.__dict__.items()
             if not k.startswith('_')
         }
-        if data.get('brand'):
-            data['brand'] = BrandCar(data['brand'])
         return Vehicle(**data)
 
     def save(self, vehicle: Vehicle) -> Vehicle:
@@ -28,14 +25,10 @@ class VehicleRepository:
                 raise ValueError(f'Vehicle with id {vehicle.id} not found')
 
             update_data = vehicle.model_dump(exclude={'id'})
-            if 'brand' in update_data and update_data['brand']:
-                update_data['brand'] = update_data['brand'].value
             for key, value in update_data.items():
                 setattr(db_vehicle, key, value)
         else:
             vehicle_data = vehicle.model_dump(exclude={'id'})
-            if vehicle_data.get('brand'):
-                vehicle_data['brand'] = vehicle_data['brand'].value
             db_vehicle = VehicleDB(**vehicle_data)
             self.db.add(db_vehicle)
 

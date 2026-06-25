@@ -1,3 +1,6 @@
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
 from app.api.enums.schema import (
     BrandsResponse,
     BrandResponse,
@@ -6,25 +9,28 @@ from app.api.enums.schema import (
     LiquidsResponse,
     LiquidResponse,
 )
-from app.common.enums import (
-    BrandCar,
-    LiquidType,
-    CarModel,
-)
+from app.common.enums import LiquidType
+from app.db.database import get_db
+from app.repository.enum_repository import EnumRepository
 
 
 class EnumsHandler:
-    async def get_brands(self) -> BrandsResponse:
+    async def get_brands(self, db: Session = Depends(get_db)) -> BrandsResponse:
         """Получить список марок автомобилей."""
-        brands = [BrandResponse(value=brand.value, label=brand.value) for brand in BrandCar]
-        return BrandsResponse(brands=brands)
+        repo = EnumRepository(db)
+        brands = repo.get_all_brands()
+        return BrandsResponse(
+            brands=[BrandResponse(value=b.name, label=b.name) for b in brands]
+        )
 
-    async def get_models(self, brand: str) -> ModelsResponse:
+    async def get_models(self, brand: str, db: Session = Depends(get_db)) -> ModelsResponse:
         """Получить список моделей для конкретной марки."""
-        models = CarModel.get_models_by_brand(brand)
+        repo = EnumRepository(db)
+        models = repo.get_models_by_brand(brand)
         if not models:
-            models = ["Другая модель"]
-        models_list = [ModelResponse(value=model, label=model) for model in models]
+            models_list = [ModelResponse(value="Другая модель", label="Другая модель")]
+        else:
+            models_list = [ModelResponse(value=m.name, label=m.name) for m in models]
         return ModelsResponse(models=models_list)
 
     async def get_liquids(self) -> LiquidsResponse:

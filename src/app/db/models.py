@@ -5,6 +5,25 @@ from datetime import datetime, timezone
 Base = declarative_base()
 
 
+class BrandDB(Base):  # type: ignore
+    __tablename__ = "brands"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+
+    models = relationship("ModelDB", back_populates="brand")
+
+
+class ModelDB(Base):  # type: ignore
+    __tablename__ = "models"
+
+    id = Column(Integer, primary_key=True, index=True)
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False)
+    name = Column(String, nullable=False)
+
+    brand = relationship("BrandDB", back_populates="models")
+
+
 class UserDB(Base):  # type: ignore
     __tablename__ = "users"
 
@@ -22,7 +41,8 @@ class VehicleDB(Base):  # type: ignore
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
-    brand = Column(String, nullable=False)  # Enum -> String
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=True)
+    brand = Column(String, nullable=False)
     model = Column(String, nullable=False)
     plate_number = Column(String, unique=True, nullable=False)
     year = Column(Integer, nullable=False)
@@ -37,6 +57,7 @@ class VehicleDB(Base):  # type: ignore
     power_steering_interval_km = Column(Integer, default=60000)
     differential_oil_interval_km = Column(Integer, default=60000)
     owner = relationship("UserDB", back_populates="vehicles")
+    brand_ref = relationship("BrandDB")
 
     replacements = relationship("ReplacementDB", back_populates="vehicle")
 

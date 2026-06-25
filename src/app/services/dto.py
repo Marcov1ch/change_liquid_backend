@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from datetime import date
 
-from app.common.enums import BrandCar, LiquidType
+from app.common.enums import LiquidType
 
 
 @dataclass
 class VehicleDTO:
     """DTO для передачи данных об авто между сервисом и handler."""
     id: int | None
-    brand: BrandCar
+    brand: str
     model: str
     plate_number: str
     year: int

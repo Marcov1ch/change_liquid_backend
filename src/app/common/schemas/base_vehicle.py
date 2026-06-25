@@ -2,15 +2,14 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.common.enums import BrandCar
-
 
 class VehicleBase(BaseModel):
     """Базовая модель авто."""
-    brand: BrandCar = Field(
+    brand: str = Field(
         ...,
         description='Марка автомобиля',
-        examples=[BrandCar.HONDA.value],
+        examples=['Honda'],
+        min_length=1,
     )
     model: str = Field(
         ...,
