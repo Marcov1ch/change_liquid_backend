@@ -9,6 +9,17 @@ class VehicleRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _to_domain(db_vehicle: VehicleDB) -> Vehicle:
+        data = {
+            k: v
+            for k, v in db_vehicle.__dict__.items()
+            if not k.startswith('_')
+        }
+        if data.get('brand'):
+            data['brand'] = BrandCar(data['brand'])
+        return Vehicle(**data)
+
     def save(self, vehicle: Vehicle) -> Vehicle:
         """Сохранить или обновить."""
         if vehicle.id:
@@ -31,33 +42,30 @@ class VehicleRepository:
         self.db.commit()
         self.db.refresh(db_vehicle)
 
-        result_dict = db_vehicle.__dict__.copy()
-        if result_dict.get('brand'):
-            result_dict['brand'] = BrandCar(result_dict['brand'])
-        return Vehicle(**result_dict)
+        return self._to_domain(db_vehicle)
 
     def find_by_plate_number(self, plate_number: str) -> Vehicle | None:
         db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.plate_number == plate_number).first()
-        return Vehicle(**db_vehicle.__dict__) if db_vehicle else None
+        return self._to_domain(db_vehicle) if db_vehicle else None
 
     def find_by_id(self, vehicle_id: int) -> Vehicle | None:
         db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
-        return Vehicle(**db_vehicle.__dict__) if db_vehicle else None
+        return self._to_domain(db_vehicle) if db_vehicle else None
 
     def find_active(self) -> list[Vehicle]:
         db_vehicles = self.db.query(VehicleDB).filter(VehicleDB.is_active).all()
-        return [Vehicle(**v.__dict__) for v in db_vehicles]
+        return [self._to_domain(v) for v in db_vehicles]
 
     def find_all(self) -> list[Vehicle]:
         """Получить все автомобили (включая удаленные)."""
         db_vehicles = self.db.query(VehicleDB).all()
-        return [Vehicle(**v.__dict__) for v in db_vehicles]
+        return [self._to_domain(v) for v in db_vehicles]
 
     def find_active_by_id(self, vehicle_id: int) -> Vehicle | None:
         db_vehicle = self.db.query(VehicleDB).filter(
             VehicleDB.id == vehicle_id, VehicleDB.is_active
         ).first()
-        return Vehicle(**db_vehicle.__dict__) if db_vehicle else None
+        return self._to_domain(db_vehicle) if db_vehicle else None
 
     def update_km(self, vehicle_id: int, new_km: int) -> Vehicle | None:
         db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
@@ -65,7 +73,7 @@ class VehicleRepository:
             db_vehicle.current_km = new_km
             self.db.commit()
             self.db.refresh(db_vehicle)
-            return Vehicle(**db_vehicle.__dict__)
+            return self._to_domain(db_vehicle)
         return None
 
     def delete(self, vehicle_id: int) -> bool:
@@ -91,11 +99,11 @@ class VehicleRepository:
             VehicleDB.owner_id == user_id,
             VehicleDB.is_active
         ).all()
-        return [Vehicle(**v.__dict__) for v in db_vehicles]
+        return [self._to_domain(v) for v in db_vehicles]
 
     def find_by_owner(self, user_id: int) -> list[Vehicle]:
         """Найти все авто владельца."""
         db_vehicles = self.db.query(VehicleDB).filter(
             VehicleDB.owner_id == user_id
         ).all()
-        return [Vehicle(**v.__dict__) for v in db_vehicles]
+        return [self._to_domain(v) for v in db_vehicles]
