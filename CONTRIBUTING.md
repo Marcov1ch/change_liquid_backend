@@ -30,6 +30,10 @@
     ```shell script
     . "/path/to/your/venv/bin/activate"
     ```
+4. Деактивировать виртуальное окружение
+    ```shell script
+    exit
+    ```
 
 
 ### Быстрая установка всех зависимостей

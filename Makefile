@@ -4,7 +4,7 @@ help:
 	@echo "Доступные команды:"
 	@echo "  make install     - установка зависимостей через poetry"
 	@echo "  make run         - запуск приложения"
-	echo "  make lint        - проверка стиля (flake8)"
+	@echo "  make lint        - проверка стиля (flake8)"
 	@echo "  make mypy  - проверка типов (mypy)"
 
 install:
