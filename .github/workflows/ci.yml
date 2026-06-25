@@ -37,4 +37,4 @@ jobs:
           python-version: "3.12"
       - run: pip install poetry
       - run: poetry install --no-root
-      - run: poetry run pytest src/tests -v
+      - run: PYTHONPATH=src poetry run pytest src/tests -v
