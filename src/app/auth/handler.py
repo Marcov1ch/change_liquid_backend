@@ -2,6 +2,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import jwt
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,14 @@ from app.auth.schemas import (
     UpdateEmailRequest,
     ChangePasswordRequest,
     MessageResponse,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+)
+from app.services.email_service import send_reset_password_email
+from app.auth.jwt import (
+    SECRET_KEY,
+    ALGORITHM,
+    verify_token,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -226,3 +235,77 @@ async def delete_account(
     db.commit()
 
     return MessageResponse(detail="Account deactivated")
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Отправить письмо для восстановления пароля."""
+    user = db.query(UserDB).filter(
+        UserDB.username == request.username,
+        UserDB.email == request.email,
+    ).first()
+
+    if not user:
+        return MessageResponse(
+            detail="Если такой email зарегистрирован, письмо отправлено"
+        )
+
+    reset_token = jwt.encode(
+        {
+            "sub": user.email,
+            "type": "password_reset",
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+    try:
+        send_reset_password_email(to_email=user.email, token=reset_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Не удалось отправить письмо. Попробуйте позже.",
+        )
+
+    return MessageResponse(
+        detail="Если такой email зарегистрирован, письмо отправлено"
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Сбросить пароль по токену."""
+    try:
+        payload = verify_token(request.token, "password_reset")
+        email = payload.get("sub")
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Недействительный токен",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недействительный или просроченный токен",
+        )
+
+    user = db.query(UserDB).filter(UserDB.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Пользователь не найден",
+        )
+
+    user.hashed_password = hash_password(request.new_password)
+    db.commit()
+
+    return MessageResponse(detail="Пароль успешно изменён")

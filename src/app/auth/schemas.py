@@ -50,3 +50,13 @@ class ChangePasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     detail: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    username: str
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str

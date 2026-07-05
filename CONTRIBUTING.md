@@ -69,7 +69,3 @@ docker-compose logs -f
 ```shell script
 docker-compose down
 ```
-### Удалить пользователя
-```shell script
-poetry run python script/delete_user.py
-```
