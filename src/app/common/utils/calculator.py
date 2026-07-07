@@ -51,7 +51,7 @@ class LiquidCalculator:
     ) -> str:
         """Получить общий статус автомобиля."""
         if not replacements:
-            return StatusEnum.GOOD.value  # type: ignore[no-any-return]
+            return StatusEnum.UNKNOWN.value  # type: ignore[no-any-return]
 
         last_by_type: dict[LiquidType, ReplacementDTO] = {}
         for r in replacements:
