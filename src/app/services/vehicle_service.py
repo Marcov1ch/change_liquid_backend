@@ -22,7 +22,6 @@ class VehicleService:
         """Создать авто."""
         brand = self.enum_repo.get_brand_by_name(vehicle_data.brand)
         if not brand:
-            from app.common.enums import StatusEnum
             raise ValueError(f'Brand "{vehicle_data.brand}" not found')
 
         models = self.enum_repo.get_models_by_brand(vehicle_data.brand)

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.db.models import VehicleDB, BrandDB, ModelDB
+from app.db.models import VehicleDB
 from app.common.models.vehicle import Vehicle
 
 
