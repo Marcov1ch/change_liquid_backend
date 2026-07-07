@@ -10,7 +10,7 @@ BRANDS_MODELS: dict[str, list[str]] = {
     "Audi": ["A4", "A6", "Q5", "Q7", "A3", "Q3"],
     "Volkswagen": ["Golf", "Passat", "Tiguan", "Polo", "Touareg"],
     "Ford": ["Focus", "Mondeo", "Kuga", "Fiesta", "Explorer"],
-    "Chevrolet": ["Cruze", "Malibu", "Traverse", "Equinox", "Spark"],
+    "Chevrolet": ["Cruze", "Malibu", "Traverse", "Equinox", "Spark", "Lacetti"],
     "Hyundai": ["Sonata", "Elantra", "Santa Fe", "Tucson", "Kona"],
     "Kia": ["Optima", "Sportage", "Sorento", "Rio", "Ceed"],
     "Nissan": ["X-Trail", "Qashqai", "Juke", "Teana", "Murano"],
