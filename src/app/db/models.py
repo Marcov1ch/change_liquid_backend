@@ -41,9 +41,8 @@ class VehicleDB(Base):  # type: ignore
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
-    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=True)
-    brand = Column(String, nullable=False)
-    model = Column(String, nullable=False)
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False)
+    model_id = Column(Integer, ForeignKey("models.id"), nullable=False)
     plate_number = Column(String, unique=True, nullable=False)
     year = Column(Integer, nullable=False)
     current_km = Column(Integer, nullable=False)
@@ -57,7 +56,8 @@ class VehicleDB(Base):  # type: ignore
     power_steering_interval_km = Column(Integer, default=60000)
     differential_oil_interval_km = Column(Integer, default=60000)
     owner = relationship("UserDB", back_populates="vehicles")
-    brand_ref = relationship("BrandDB")
+    brand_ref = relationship("BrandDB", lazy="joined")
+    model_ref = relationship("ModelDB", lazy="joined")
 
     replacements = relationship("ReplacementDB", back_populates="vehicle")
 

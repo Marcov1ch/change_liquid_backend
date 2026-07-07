@@ -9,6 +9,14 @@ class Vehicle(VehicleBase, VehicleIntervals):
         None,
         description='id автомобиля',
     )
+    brand_id: int = Field(
+        ...,
+        description='id марки из таблицы brands',
+    )
+    model_id: int = Field(
+        ...,
+        description='id модели из таблицы models',
+    )
     owner_id: int | None = Field(
         None,
         description='id владельца',
