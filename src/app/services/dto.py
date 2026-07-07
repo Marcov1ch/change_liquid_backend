@@ -10,6 +10,8 @@ class VehicleDTO:
     id: int | None
     brand: str
     model: str
+    brand_id: int
+    model_id: int
     plate_number: str
     year: int
     current_km: int

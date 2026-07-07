@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.common.schemas.base_vehicle import VehicleBase
 from app.common.models.vehicle import Vehicle
+from app.repository.enum_repository import EnumRepository
 from app.repository.vehicle_repository import VehicleRepository
 from app.services.dto import VehicleDTO
 
@@ -11,6 +12,7 @@ class VehicleService:
 
     def __init__(self, db: Session):
         self.repository = VehicleRepository(db)
+        self.enum_repo = EnumRepository(db)
 
     def create(
         self,
@@ -18,10 +20,22 @@ class VehicleService:
         vehicle_data: VehicleBase,
     ) -> VehicleDTO:
         """Создать авто."""
+        brand = self.enum_repo.get_brand_by_name(vehicle_data.brand)
+        if not brand:
+            from app.common.enums import StatusEnum
+            raise ValueError(f'Brand "{vehicle_data.brand}" not found')
+
+        models = self.enum_repo.get_models_by_brand(vehicle_data.brand)
+        model = next((m for m in models if m.name == vehicle_data.model), None)
+        if not model:
+            raise ValueError(f'Model "{vehicle_data.model}" not found for brand "{vehicle_data.brand}"')
+
         vehicle = Vehicle(
             id=None,
             brand=vehicle_data.brand,
             model=vehicle_data.model,
+            brand_id=brand.id,
+            model_id=model.id,
             plate_number=vehicle_data.plate_number,
             year=vehicle_data.year,
             current_km=vehicle_data.current_km,
@@ -82,6 +96,8 @@ class VehicleService:
             id=vehicle_data.id,
             brand=vehicle_data.brand,
             model=vehicle_data.model,
+            brand_id=vehicle_data.brand_id,
+            model_id=vehicle_data.model_id,
             plate_number=vehicle_data.plate_number,
             year=vehicle_data.year,
             current_km=vehicle_data.current_km,
@@ -119,6 +135,8 @@ class VehicleService:
             id=vehicle.id,
             brand=vehicle.brand,
             model=vehicle.model,
+            brand_id=vehicle.brand_id,
+            model_id=vehicle.model_id,
             plate_number=vehicle.plate_number,
             year=vehicle.year,
             current_km=vehicle.current_km,

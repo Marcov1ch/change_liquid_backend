@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.db.models import VehicleDB
+from app.db.models import VehicleDB, BrandDB, ModelDB
 from app.common.models.vehicle import Vehicle
 
 
@@ -10,25 +10,38 @@ class VehicleRepository:
 
     @staticmethod
     def _to_domain(db_vehicle: VehicleDB) -> Vehicle:
-        data = {
-            k: v
-            for k, v in db_vehicle.__dict__.items()
-            if not k.startswith('_')
-        }
-        return Vehicle(**data)
+        return Vehicle(
+            id=db_vehicle.id,
+            brand=db_vehicle.brand_ref.name,
+            model=db_vehicle.model_ref.name,
+            brand_id=db_vehicle.brand_id,
+            model_id=db_vehicle.model_id,
+            plate_number=db_vehicle.plate_number,
+            year=db_vehicle.year,
+            current_km=db_vehicle.current_km,
+            is_active=db_vehicle.is_active,
+            owner_id=db_vehicle.owner_id,
+            oil_interval_km=db_vehicle.oil_interval_km,
+            transmission_interval_km=db_vehicle.transmission_interval_km,
+            brake_interval_km=db_vehicle.brake_interval_km,
+            coolant_interval_km=db_vehicle.coolant_interval_km,
+            power_steering_interval_km=db_vehicle.power_steering_interval_km,
+            differential_oil_interval_km=db_vehicle.differential_oil_interval_km,
+        )
 
     def save(self, vehicle: Vehicle) -> Vehicle:
         """Сохранить или обновить."""
+        db_exclude = {'id', 'brand', 'model'}
         if vehicle.id:
             db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle.id).first()
             if not db_vehicle:
                 raise ValueError(f'Vehicle with id {vehicle.id} not found')
 
-            update_data = vehicle.model_dump(exclude={'id'})
+            update_data = vehicle.model_dump(exclude=db_exclude)
             for key, value in update_data.items():
                 setattr(db_vehicle, key, value)
         else:
-            vehicle_data = vehicle.model_dump(exclude={'id'})
+            vehicle_data = vehicle.model_dump(exclude=db_exclude)
             db_vehicle = VehicleDB(**vehicle_data)
             self.db.add(db_vehicle)
 
