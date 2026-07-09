@@ -1,3 +1,5 @@
+from typing import cast
+
 from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
@@ -10,7 +12,7 @@ from app.api.vehicle.schema import (
 )
 from app.common.enums import StatusEnum
 from app.common.liquid_config import LIQUIDS_CONFIG
-from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
+from app.common.utils.templates.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
 from app.db.database import get_db
 from app.db.models import UserDB
 from app.auth.jwt import get_current_user
@@ -18,6 +20,7 @@ from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import LiquidCalculator
+from app.services.notification_service import NotificationService
 
 
 class VehicleHandler:
@@ -29,6 +32,7 @@ class VehicleHandler:
         vehicle_status: str = StatusEnum.UNKNOWN.value,
     ) -> VehicleResponse:
         """Преобразование VehicleDTO в VehicleResponse."""
+        assert vehicle_dto.id is not None
         return VehicleResponse(
             id=vehicle_dto.id,
             brand=vehicle_dto.brand,
@@ -44,6 +48,18 @@ class VehicleHandler:
             power_steering_interval_km=vehicle_dto.power_steering_interval_km,
             differential_oil_interval_km=vehicle_dto.differential_oil_interval_km,
             vehicle_status=vehicle_status,
+            oil_notify_enabled=vehicle_dto.oil_notify_enabled,
+            transmission_notify_enabled=vehicle_dto.transmission_notify_enabled,
+            brake_notify_enabled=vehicle_dto.brake_notify_enabled,
+            coolant_notify_enabled=vehicle_dto.coolant_notify_enabled,
+            power_steering_notify_enabled=vehicle_dto.power_steering_notify_enabled,
+            differential_oil_notify_enabled=vehicle_dto.differential_oil_notify_enabled,
+            oil_km_remaining=None,
+            transmission_km_remaining=None,
+            brake_km_remaining=None,
+            coolant_km_remaining=None,
+            power_steering_km_remaining=None,
+            differential_oil_km_remaining=None,
         )
 
     def _calc_remaining(
@@ -65,6 +81,7 @@ class VehicleHandler:
         replacement_service: ReplacementService,
     ) -> VehicleResponse:
         """Обогатить ответ остатками км до замен."""
+        assert vehicle_dto.id is not None
         for config in LIQUIDS_CONFIG:
             last = replacement_service.get_last_for_vehicle_and_liquid(vehicle_dto.id, config.type)
             interval = getattr(vehicle_dto, config.interval_field)
@@ -81,6 +98,7 @@ class VehicleHandler:
         response = self._to_response(vehicle_dto)
         response = self._enrich_with_remaining(response, vehicle_dto, replacement_service)
 
+        assert vehicle_dto.id is not None
         # Получаем статус автомобиля
         replacements = replacement_service.get_by_vehicle(vehicle_dto.id)
         worst_status = LiquidCalculator.get_vehicle_status(vehicle_dto, replacements)
@@ -119,9 +137,11 @@ class VehicleHandler:
         replacement_service = ReplacementService(db)
 
         if include_archived:
-            vehicles_dto = vehicle_service.get_all_vehicles_by_owner(current_user.id)
+            uid = cast(int, current_user.id)
+            vehicles_dto = vehicle_service.get_all_vehicles_by_owner(uid)
         else:
-            vehicles_dto = vehicle_service.get_all_active_by_owner(current_user.id)
+            uid = cast(int, current_user.id)
+            vehicles_dto = vehicle_service.get_all_active_by_owner(uid)
 
         return [self._build_vehicle_response(v, replacement_service) for v in vehicles_dto]
 
@@ -155,7 +175,7 @@ class VehicleHandler:
                     detail=ERROR_MESSAGES['plate_number_exists'].format(plate_number=request.plate_number),
                 )
 
-            vehicle_dto = vehicle_service.create(current_user.id, request)
+            vehicle_dto = vehicle_service.create(cast(int, current_user.id), request)
 
             return self._to_response(vehicle_dto)
         except HTTPException:
@@ -182,6 +202,8 @@ class VehicleHandler:
             for field, value in updated_data.items():
                 setattr(existing_dto, field, value)
             updated_dto = vehicle_service.update(existing_dto)
+            if updated_dto is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Vehicle not found')
 
             return self._to_response(updated_dto)
         except HTTPException:
@@ -208,6 +230,12 @@ class VehicleHandler:
                 vehicle_id=vehicle_id,
                 new_km=request.new_km,
             )
+            if vehicle_dto is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Vehicle not found')
+
+            notification_service = NotificationService(db)
+            notification_service.check_and_notify(vehicle_id)
+
             return self._to_response(vehicle_dto)
         except ValueError as err:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
@@ -235,6 +263,8 @@ class VehicleHandler:
             for field, value in updated_data.items():
                 setattr(existing_dto, field, value)
             updated_dto = vehicle_service.update(existing_dto)
+            if updated_dto is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Vehicle not found')
             return self._to_response(updated_dto)
         except Exception as err:
             raise HTTPException(
@@ -281,7 +311,8 @@ class VehicleHandler:
 
             replacements = replacement_service.get_by_vehicle(vehicle_id)
             for replacement in replacements:
-                replacement_service.delete(replacement.id)
+                if replacement.id is not None:
+                    replacement_service.delete(replacement.id)
             vehicle_service.hard_delete(vehicle_id)
 
             return {
@@ -314,6 +345,8 @@ class VehicleHandler:
                 )
             existing_dto.is_active = True
             updated_dto = vehicle_service.update(existing_dto)
+            if updated_dto is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Vehicle not found')
             return self._to_response(updated_dto)
         except HTTPException:
             raise
