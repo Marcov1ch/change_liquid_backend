@@ -15,6 +15,10 @@ services:
       - SMTP_FROM=${SMTP_FROM}
       - FRONTEND_URL=${FRONTEND_URL}
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 150M
 
   frontend:
     build: ../change_liquid_frontend
@@ -23,3 +27,7 @@ services:
     depends_on:
       - backend
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 50M
