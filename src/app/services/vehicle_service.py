@@ -101,12 +101,19 @@ class VehicleService:
             year=vehicle_data.year,
             current_km=vehicle_data.current_km,
             is_active=vehicle_data.is_active,
+            owner_id=vehicle_data.owner_id,
             oil_interval_km=vehicle_data.oil_interval_km,
             transmission_interval_km=vehicle_data.transmission_interval_km,
             brake_interval_km=vehicle_data.brake_interval_km,
             coolant_interval_km=vehicle_data.coolant_interval_km,
             power_steering_interval_km=vehicle_data.power_steering_interval_km,
             differential_oil_interval_km=vehicle_data.differential_oil_interval_km,
+            oil_notify_enabled=vehicle_data.oil_notify_enabled,
+            transmission_notify_enabled=vehicle_data.transmission_notify_enabled,
+            brake_notify_enabled=vehicle_data.brake_notify_enabled,
+            coolant_notify_enabled=vehicle_data.coolant_notify_enabled,
+            power_steering_notify_enabled=vehicle_data.power_steering_notify_enabled,
+            differential_oil_notify_enabled=vehicle_data.differential_oil_notify_enabled,
         )
         updated = self.repository.save(vehicle)
         return self._to_dto(updated) if updated else None
@@ -147,4 +154,10 @@ class VehicleService:
             coolant_interval_km=vehicle.coolant_interval_km,
             power_steering_interval_km=vehicle.power_steering_interval_km,
             differential_oil_interval_km=vehicle.differential_oil_interval_km,
+            oil_notify_enabled=vehicle.oil_notify_enabled,
+            transmission_notify_enabled=vehicle.transmission_notify_enabled,
+            brake_notify_enabled=vehicle.brake_notify_enabled,
+            coolant_notify_enabled=vehicle.coolant_notify_enabled,
+            power_steering_notify_enabled=vehicle.power_steering_notify_enabled,
+            differential_oil_notify_enabled=vehicle.differential_oil_notify_enabled,
         )

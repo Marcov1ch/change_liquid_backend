@@ -10,7 +10,7 @@ from app.api.vehicle.schema import (
 )
 from app.common.enums import StatusEnum
 from app.common.liquid_config import LIQUIDS_CONFIG
-from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
+from app.common.utils.templates.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
 from app.db.database import get_db
 from app.db.models import UserDB
 from app.auth.jwt import get_current_user
@@ -18,6 +18,7 @@ from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import LiquidCalculator
+from app.services.notification_service import NotificationService
 
 
 class VehicleHandler:
@@ -44,6 +45,12 @@ class VehicleHandler:
             power_steering_interval_km=vehicle_dto.power_steering_interval_km,
             differential_oil_interval_km=vehicle_dto.differential_oil_interval_km,
             vehicle_status=vehicle_status,
+            oil_notify_enabled=vehicle_dto.oil_notify_enabled,
+            transmission_notify_enabled=vehicle_dto.transmission_notify_enabled,
+            brake_notify_enabled=vehicle_dto.brake_notify_enabled,
+            coolant_notify_enabled=vehicle_dto.coolant_notify_enabled,
+            power_steering_notify_enabled=vehicle_dto.power_steering_notify_enabled,
+            differential_oil_notify_enabled=vehicle_dto.differential_oil_notify_enabled,
         )
 
     def _calc_remaining(
@@ -208,6 +215,10 @@ class VehicleHandler:
                 vehicle_id=vehicle_id,
                 new_km=request.new_km,
             )
+
+            notification_service = NotificationService(db)
+            notification_service.check_and_notify(vehicle_id)
+
             return self._to_response(vehicle_dto)
         except ValueError as err:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))

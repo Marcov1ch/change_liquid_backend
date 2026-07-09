@@ -1,13 +1,13 @@
 from pydantic import BaseModel, Field
 
-from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals
+from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals, Notify
 
 
-class VehicleRequest(VehicleBase, VehicleIntervals):
+class VehicleRequest(VehicleBase, VehicleIntervals, Notify):
     """Модель запроса создания авто."""
 
 
-class VehicleResponse(VehicleIntervals, VehicleBase):
+class VehicleResponse(VehicleIntervals, VehicleBase, Notify):
     """Модель ответа с данными авто."""
     id: int = Field(
         ...,
@@ -57,8 +57,14 @@ class UpdateKMRequest(BaseModel):
     )
 
 
-class UpdateVehicleData(VehicleBase):
+class UpdateVehicleData(VehicleBase, VehicleIntervals):
     """Обновить данные автомобиля."""
+    oil_notify_enabled: bool | None = Field(None, description='Уведомлять о замене масла')
+    transmission_notify_enabled: bool | None = Field(None, description='Уведомлять о замене масла АКПП')
+    brake_notify_enabled: bool | None = Field(None, description='Уведомлять о замене тормозной жидкости')
+    coolant_notify_enabled: bool | None = Field(None, description='Уведомлять о замене антифриза')
+    power_steering_notify_enabled: bool | None = Field(None, description='Уведомлять о замене жидкости ГУР')
+    differential_oil_notify_enabled: bool | None = Field(None, description='Уведомлять о замене масла в редукторе')
 
 
 class VehicleUpdateIntervals(VehicleIntervals):
