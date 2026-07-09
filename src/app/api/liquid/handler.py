@@ -31,9 +31,12 @@ class ReplacementHandler:
         config = next((c for c in LIQUIDS_CONFIG if c.type == replacement_dto.liquid_type), None)
         interval = getattr(vehicle, config.interval_field) if config else replacement_dto.interval_km
 
+        response_id = replacement_dto.id
+        assert response_id is not None
+
         if not is_latest:
             return LiquidReplacementResponse(
-                id=replacement_dto.id,
+                id=response_id,
                 vehicle_id=replacement_dto.vehicle_id,
                 liquid_type=replacement_dto.liquid_type,
                 liquid_name=replacement_dto.liquid_name,
@@ -55,7 +58,7 @@ class ReplacementHandler:
         )
 
         return LiquidReplacementResponse(
-            id=replacement_dto.id,
+            id=response_id,
             vehicle_id=replacement_dto.vehicle_id,
             liquid_type=replacement_dto.liquid_type,
             liquid_name=replacement_dto.liquid_name,
@@ -107,6 +110,7 @@ class ReplacementHandler:
             for replacement_request in request.replacements:
                 replacement_dto = replacement_service.create(vehicle_id, replacement_request)
                 vehicle = vehicle_service.get_active_by_id(vehicle_id)
+                assert vehicle is not None
                 results.append(self._to_response(replacement_dto, vehicle.current_km, vehicle))
             return results
         except ValueError as err:
@@ -136,6 +140,7 @@ class ReplacementHandler:
             self._check_vehicle_access(vehicle_id, current_user, vehicle_service)
 
             vehicle = vehicle_service.get_active_by_id(vehicle_id)
+            assert vehicle is not None
             replacements_dto = replacement_service.get_by_vehicle(vehicle_id)
 
             latest_per_type: dict[str, int] = {}
@@ -180,6 +185,7 @@ class ReplacementHandler:
             self._check_vehicle_access(replacement_dto.vehicle_id, current_user, vehicle_service)
 
             vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
+            assert vehicle is not None
             return self._to_response(replacement_dto, vehicle.current_km, vehicle)
         except HTTPException:
             raise
@@ -212,8 +218,10 @@ class ReplacementHandler:
 
             update_data = request.model_dump(exclude_none=True)
             replacement_dto = replacement_service.update(replacement_id, **update_data)
+            assert replacement_dto is not None
 
             vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
+            assert vehicle is not None
             return self._to_response(replacement_dto, vehicle.current_km, vehicle)
         except ValueError as err:
             raise HTTPException(

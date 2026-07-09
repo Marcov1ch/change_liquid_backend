@@ -3,7 +3,7 @@ from typing import Any, cast
 
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+from jose import jwt, JWTError  # type: ignore[import-untyped]
 from sqlalchemy.orm import Session
 import os
 
