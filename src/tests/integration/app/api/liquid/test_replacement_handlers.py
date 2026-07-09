@@ -176,7 +176,9 @@ class TestUpdateReplacement:
         assert data["km_at_replacement"] == 52000
         assert data["liquid_name"] == "Updated Oil"
 
-    def test_update_other_user_replacement(self, client, auth_headers, other_auth_headers, vehicle, replacement):
+    def test_update_other_user_replacement(
+        self, client, auth_headers, other_auth_headers, vehicle, replacement,
+    ):
         resp = client.put(
             f"/api/v1/replacements/{replacement['id']}",
             json={"km_at_replacement": 47000},
@@ -199,7 +201,9 @@ class TestDeleteReplacement:
         )
         assert len(resp.json()) == 0
 
-    def test_delete_other_user_replacement(self, client, auth_headers, other_auth_headers, vehicle, replacement):
+    def test_delete_other_user_replacement(
+        self, client, auth_headers, other_auth_headers, vehicle, replacement,
+    ):
         resp = client.delete(
             f"/api/v1/replacements/{replacement['id']}",
             headers=other_auth_headers,

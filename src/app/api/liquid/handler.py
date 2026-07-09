@@ -140,11 +140,15 @@ class ReplacementHandler:
 
             latest_per_type: dict[str, int] = {}
             for r in replacements_dto:
-                if r.liquid_type.value not in latest_per_type or r.km_at_replacement > latest_per_type[r.liquid_type.value]:
-                    latest_per_type[r.liquid_type.value] = r.km_at_replacement
+                lt = r.liquid_type.value
+                if lt not in latest_per_type or r.km_at_replacement > latest_per_type[lt]:
+                    latest_per_type[lt] = r.km_at_replacement
 
             return [
-                self._to_response(r, vehicle.current_km, vehicle, is_latest=(r.km_at_replacement == latest_per_type.get(r.liquid_type.value)))
+                self._to_response(
+                    r, vehicle.current_km, vehicle,
+                    is_latest=(r.km_at_replacement == latest_per_type.get(r.liquid_type.value)),
+                )
                 for r in replacements_dto
             ]
         except HTTPException:

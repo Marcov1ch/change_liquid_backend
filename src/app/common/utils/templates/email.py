@@ -57,7 +57,7 @@ def render_replacement_notification_body(
             <tr style="background:#ffebee;">
                 <th style="padding:8px;text-align:left;border-bottom:2px solid #d32f2f;">Жидкость</th>
                 <th style="padding:8px;text-align:center;border-bottom:2px solid #d32f2f;">Заменено при</th>
-                <th style="padding:8px;text-align:center;border-bottom:2px solid #d32f2f;">Требовалось при</th>
+                <th style="padding:8px;text-align:center;border-bottom:2px solid #d32f2f;">Нужно при</th>
                 <th style="padding:8px;text-align:center;border-bottom:2px solid #d32f2f;">Превышение</th>
             </tr>
             {overdue_rows}

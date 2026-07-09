@@ -2,20 +2,20 @@ import os
 import tempfile
 os.environ["SECRET_KEY"] = "test-secret-key-for-testing"
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import pytest  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from app.db.models import Base
-from app.db.database import get_db
-from app.db.seed import seed_brands
-from app.auth.handler import router as auth_router
-from app.api.routes import setup_routes
-from app.auth.jwt import create_access_token
-from app.auth.password import hash_password
-from app.db.models import UserDB
+from app.db.models import Base  # noqa: E402
+from app.db.database import get_db  # noqa: E402
+from app.db.seed import seed_brands  # noqa: E402
+from app.auth.handler import router as auth_router  # noqa: E402
+from app.api.routes import setup_routes  # noqa: E402
+from app.auth.jwt import create_access_token  # noqa: E402
+from app.auth.password import hash_password  # noqa: E402
+from app.db.models import UserDB  # noqa: E402
 
 
 @pytest.fixture
