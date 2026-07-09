@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from jose import jwt  # type: ignore[import-untyped]
+from jose import jwt
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
