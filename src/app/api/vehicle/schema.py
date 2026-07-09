@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
 
 from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals
 
@@ -57,9 +59,45 @@ class UpdateKMRequest(BaseModel):
     )
 
 
-class UpdateVehicleData(VehicleBase):
-    """Обновить данные автомобиля."""
+class UpdateVehicleData(BaseModel):
+    """Обновить данные автомобиля (PATCH — все поля опциональны)."""
+    brand: str | None = None
+    model: str | None = None
+    plate_number: str | None = None
+    year: int | None = Field(None, ge=1960, le=2026)
+    current_km: int | None = Field(None, ge=0)
+    oil_interval_km: int | None = Field(None, ge=1000)
+    transmission_interval_km: int | None = Field(None, ge=10000)
+    brake_interval_km: int | None = Field(None, ge=10000)
+    coolant_interval_km: int | None = Field(None, ge=10000)
+    power_steering_interval_km: int | None = Field(None, ge=10000)
+    differential_oil_interval_km: int | None = Field(None, ge=10000)
+
+    @field_validator('plate_number')
+    @classmethod
+    def validate_plate_number(cls, v: str) -> str:
+        if v is None:
+            return v
+        allowed_letters = 'АВЕІКМНОРСТУХ'
+        patterns = [
+            rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',
+            rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',
+            rf'^\d{{4}}[{allowed_letters}]{{2}}$',
+        ]
+        cleaned = v.replace(' ', '').replace('-', '').upper()
+        if not any(re.match(p, cleaned) for p in patterns):
+            raise ValueError(
+                'Некорректный формат госномера. '
+                'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
+            )
+        return cleaned
 
 
-class VehicleUpdateIntervals(VehicleIntervals):
-    """Обновление интервалов замен."""
+class VehicleUpdateIntervals(BaseModel):
+    """Обновление интервалов замен (PATCH — все поля опциональны)."""
+    oil_interval_km: int | None = Field(None, ge=1000)
+    transmission_interval_km: int | None = Field(None, ge=10000)
+    brake_interval_km: int | None = Field(None, ge=10000)
+    coolant_interval_km: int | None = Field(None, ge=10000)
+    power_steering_interval_km: int | None = Field(None, ge=10000)
+    differential_oil_interval_km: int | None = Field(None, ge=10000)

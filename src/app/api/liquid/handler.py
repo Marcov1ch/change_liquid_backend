@@ -10,10 +10,14 @@ from app.api.liquid.schema import (
 from app.db.database import get_db
 from app.db.models import UserDB
 from app.auth.jwt import get_current_user
-from app.services.dto import ReplacementDTO
+from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
+from app.common.enums import StatusEnum
+from app.common.liquid_config import LIQUIDS_CONFIG
 from app.common.utils.calculator import LiquidCalculator
+
+_LIQUID_FIELD = {cfg.type: cfg.interval_field for cfg in LIQUIDS_CONFIG}
 
 
 class ReplacementHandler:
@@ -21,13 +25,32 @@ class ReplacementHandler:
     def _to_response(
         self,
         replacement_dto: ReplacementDTO,
-        current_km: int,
+        vehicle: VehicleDTO,
+        is_latest: bool = True,
     ) -> LiquidReplacementResponse:
         """Преобразовать DTO в Response с расчётом статуса."""
+        if not is_latest:
+            return LiquidReplacementResponse(
+                id=replacement_dto.id,
+                vehicle_id=replacement_dto.vehicle_id,
+                liquid_type=replacement_dto.liquid_type,
+                liquid_name=replacement_dto.liquid_name,
+                liquid_price=replacement_dto.liquid_price,
+                work_price=replacement_dto.work_price,
+                replacement_date=replacement_dto.replacement_date,
+                km_at_replacement=replacement_dto.km_at_replacement,
+                interval_km=replacement_dto.interval_km,
+                next_replacement_km=0,
+                km_remaining=0,
+                status=StatusEnum.REPLACED.value,
+                status_message="📌 Заменено (предыдущая запись)",
+            )
+
+        interval = getattr(vehicle, _LIQUID_FIELD[replacement_dto.liquid_type])
         status_data = LiquidCalculator.calculate_status(
             km_at_replacement=replacement_dto.km_at_replacement,
-            interval_km=replacement_dto.interval_km,
-            current_km=current_km
+            interval_km=interval,
+            current_km=vehicle.current_km,
         )
 
         return LiquidReplacementResponse(
@@ -83,7 +106,7 @@ class ReplacementHandler:
             for replacement_request in request.replacements:
                 replacement_dto = replacement_service.create(vehicle_id, replacement_request)
                 vehicle = vehicle_service.get_active_by_id(vehicle_id)
-                results.append(self._to_response(replacement_dto, vehicle.current_km))
+                results.append(self._to_response(replacement_dto, vehicle))
             return results
         except ValueError as err:
             raise HTTPException(
@@ -113,7 +136,18 @@ class ReplacementHandler:
 
             vehicle = vehicle_service.get_active_by_id(vehicle_id)
             replacements_dto = replacement_service.get_by_vehicle(vehicle_id)
-            return [self._to_response(r, vehicle.current_km) for r in replacements_dto]
+
+            latest_per_type: dict[str, int] = {}
+            for r in replacements_dto:
+                prev = latest_per_type.get(r.liquid_type.value)
+                if prev is None or r.km_at_replacement > prev:
+                    latest_per_type[r.liquid_type.value] = r.km_at_replacement
+
+            result = []
+            for r in replacements_dto:
+                is_latest = latest_per_type.get(r.liquid_type.value) == r.km_at_replacement
+                result.append(self._to_response(r, vehicle, is_latest))
+            return result
         except HTTPException:
             raise
         except Exception as err:
@@ -143,7 +177,7 @@ class ReplacementHandler:
             self._check_vehicle_access(replacement_dto.vehicle_id, current_user, vehicle_service)
 
             vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
-            return self._to_response(replacement_dto, vehicle.current_km)
+            return self._to_response(replacement_dto, vehicle)
         except HTTPException:
             raise
         except Exception as err:
@@ -177,7 +211,7 @@ class ReplacementHandler:
             replacement_dto = replacement_service.update(replacement_id, **update_data)
 
             vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
-            return self._to_response(replacement_dto, vehicle.current_km)
+            return self._to_response(replacement_dto, vehicle)
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

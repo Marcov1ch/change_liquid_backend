@@ -101,6 +101,7 @@ class VehicleService:
             year=vehicle_data.year,
             current_km=vehicle_data.current_km,
             is_active=vehicle_data.is_active,
+            owner_id=vehicle_data.owner_id,
             oil_interval_km=vehicle_data.oil_interval_km,
             transmission_interval_km=vehicle_data.transmission_interval_km,
             brake_interval_km=vehicle_data.brake_interval_km,

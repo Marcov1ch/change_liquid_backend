@@ -1,11 +1,13 @@
 from typing import Final
 
 from app.common.enums import StatusEnum, LiquidType
+from app.common.liquid_config import LIQUIDS_CONFIG
 from app.services.dto import VehicleDTO, ReplacementDTO
 
 _OVERDUE: Final[int] = 250
 _CRITICAL: Final[int] = 500
 _WARNING: Final[int] = 1000
+_LIQUID_FIELD: dict[LiquidType, str] = {cfg.type: cfg.interval_field for cfg in LIQUIDS_CONFIG}
 
 
 class LiquidCalculator:
@@ -60,9 +62,10 @@ class LiquidCalculator:
 
         has_warning = False
         for r in last_by_type.values():
+            interval = getattr(vehicle_dto, _LIQUID_FIELD[r.liquid_type])
             status = LiquidCalculator.calculate_status(
                 r.km_at_replacement,
-                r.interval_km,
+                interval,
                 vehicle_dto.current_km)['status']
             if status == StatusEnum.OVERDUE.value:
                 return StatusEnum.OVERDUE.value  # type: ignore[no-any-return]
