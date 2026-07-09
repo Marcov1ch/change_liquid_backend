@@ -18,4 +18,3 @@ class StatusEnum(Enum):
     WARNING = "warning"
     GOOD = "good"
     UNKNOWN = "unknown"
-    REPLACED = "replaced"

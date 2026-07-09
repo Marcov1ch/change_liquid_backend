@@ -21,26 +21,6 @@ mypy = "^1.19.1"
 flake8 = "^7.3.0"
 ruff = "^0.15.8"
 pytest = "^9.1.1"
-httpx = "^0.28.1"
-
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["src/tests"]
-
-[tool.mypy]
-mypy_path = ["src"]
-exclude = [
-    "src/tests/",
-]
-
-[[tool.mypy.overrides]]
-module = [
-    "app.repository.*",
-    "app.auth.handler",
-    "app.services.notification_service",
-    "app.api.enums.handler",
-]
-ignore_errors = true
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]

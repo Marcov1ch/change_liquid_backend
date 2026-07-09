@@ -97,31 +97,3 @@ class VehicleIntervals(BaseModel):
         examples=[80000],
         ge=10000,
     )
-
-
-class Notify(BaseModel):
-    """Настройки уведомлений по email для жидкостей."""
-    oil_notify_enabled: bool = Field(
-        True,
-        description='Уведомлять о замене масла',
-    )
-    transmission_notify_enabled: bool = Field(
-        True,
-        description='Уведомлять о замене масла АКПП',
-    )
-    brake_notify_enabled: bool = Field(
-        True,
-        description='Уведомлять о замене тормозной жидкости',
-    )
-    coolant_notify_enabled: bool = Field(
-        True,
-        description='Уведомлять о замене антифриза',
-    )
-    power_steering_notify_enabled: bool = Field(
-        True,
-        description='Уведомлять о замене жидкости ГУР',
-    )
-    differential_oil_notify_enabled: bool = Field(
-        True,
-        description='Уведомлять о замене масла в редукторе',
-    )

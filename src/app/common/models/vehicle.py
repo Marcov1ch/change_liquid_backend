@@ -1,9 +1,9 @@
 from pydantic import Field
 
-from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals, Notify
+from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals
 
 
-class Vehicle(VehicleBase, VehicleIntervals, Notify):
+class Vehicle(VehicleBase, VehicleIntervals):
     """Модель авто."""
     id: int | None = Field(
         None,

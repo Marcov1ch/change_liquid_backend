@@ -1,7 +1,6 @@
 from typing import Final
 
 from app.common.enums import StatusEnum, LiquidType
-from app.common.liquid_config import LIQUIDS_CONFIG
 from app.services.dto import VehicleDTO, ReplacementDTO
 
 _OVERDUE: Final[int] = 250
@@ -61,11 +60,9 @@ class LiquidCalculator:
 
         has_warning = False
         for r in last_by_type.values():
-            config = next((c for c in LIQUIDS_CONFIG if c.type == r.liquid_type), None)
-            interval = getattr(vehicle_dto, config.interval_field) if config else r.interval_km
             status = LiquidCalculator.calculate_status(
                 r.km_at_replacement,
-                interval,
+                r.interval_km,
                 vehicle_dto.current_km)['status']
             if status == StatusEnum.OVERDUE.value:
                 return StatusEnum.OVERDUE.value  # type: ignore[no-any-return]

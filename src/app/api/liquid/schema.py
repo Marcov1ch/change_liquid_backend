@@ -2,7 +2,7 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 from app.common.schemas.base_liquid import LiquidBase
-from app.common.enums import LiquidType
+from app.common.enums import LiquidType, StatusEnum
 
 
 class LiquidReplacementRequest(LiquidBase):
@@ -50,7 +50,7 @@ class LiquidReplacementResponse(LiquidBase):
         ...,
         description='Остаток в километрах до замены',
     )
-    status: str = Field(
+    status: StatusEnum = Field(
         ...,
         description='Статус замены',
     )
@@ -62,8 +62,8 @@ class LiquidReplacementResponse(LiquidBase):
 
 class UpdateLiquidReplacementRequest(LiquidBase):
     """Обновление записи о замене."""
-    liquid_type: LiquidType | None = None  # type: ignore[assignment]
-    liquid_name: str | None = None  # type: ignore[assignment]
+    liquid_type: LiquidType | None = None
+    liquid_name: str | None = None
     replacement_date: date | None = None
     km_at_replacement: int | None = Field(None, ge=0)
 

@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
       - run: pip install poetry
       - run: poetry install --no-root
-      - run: poetry run mypy -p app
+      - run: poetry run mypy src
 
   test:
     runs-on: ubuntu-latest

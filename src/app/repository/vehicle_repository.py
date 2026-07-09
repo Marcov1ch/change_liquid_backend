@@ -27,12 +27,6 @@ class VehicleRepository:
             coolant_interval_km=db_vehicle.coolant_interval_km,
             power_steering_interval_km=db_vehicle.power_steering_interval_km,
             differential_oil_interval_km=db_vehicle.differential_oil_interval_km,
-            oil_notify_enabled=db_vehicle.oil_notify_enabled,
-            transmission_notify_enabled=db_vehicle.transmission_notify_enabled,
-            brake_notify_enabled=db_vehicle.brake_notify_enabled,
-            coolant_notify_enabled=db_vehicle.coolant_notify_enabled,
-            power_steering_notify_enabled=db_vehicle.power_steering_notify_enabled,
-            differential_oil_notify_enabled=db_vehicle.differential_oil_notify_enabled,
         )
 
     def save(self, vehicle: Vehicle) -> Vehicle:

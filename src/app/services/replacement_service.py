@@ -1,7 +1,7 @@
 from datetime import date
 from sqlalchemy.orm import Session
 from app.api.liquid.schema import LiquidReplacementRequest
-from app.common.utils.templates.messages import ERROR_MESSAGES, VALIDATION_ERRORS
+from app.common.messages import ERROR_MESSAGES, VALIDATION_ERRORS
 from app.common.models.liquid import Liquid
 from app.common.enums import LiquidType
 from app.common.models.vehicle import Vehicle
