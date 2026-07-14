@@ -3,13 +3,14 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals
+from app.common.schemas.vehicle_notify import VehicleNotify
 
 
-class VehicleRequest(VehicleBase, VehicleIntervals):
+class VehicleRequest(VehicleBase, VehicleIntervals, VehicleNotify):
     """Модель запроса создания авто."""
 
 
-class VehicleResponse(VehicleIntervals, VehicleBase):
+class VehicleResponse(VehicleIntervals, VehicleBase, VehicleNotify):
     """Модель ответа с данными авто."""
     id: int = Field(
         ...,
@@ -72,6 +73,12 @@ class UpdateVehicleData(BaseModel):
     coolant_interval_km: int | None = Field(None, ge=10000)
     power_steering_interval_km: int | None = Field(None, ge=10000)
     differential_oil_interval_km: int | None = Field(None, ge=10000)
+    oil_notify_enabled: bool | None = None
+    transmission_notify_enabled: bool | None = None
+    brake_notify_enabled: bool | None = None
+    coolant_notify_enabled: bool | None = None
+    power_steering_notify_enabled: bool | None = None
+    differential_oil_notify_enabled: bool | None = None
 
     @field_validator('plate_number')
     @classmethod
@@ -91,6 +98,16 @@ class UpdateVehicleData(BaseModel):
                 'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
             )
         return cleaned
+
+
+class UpdateVehicleNotify(BaseModel):
+    """Обновление настроек уведомлений (PATCH — все поля опциональны)."""
+    oil_notify_enabled: bool | None = None
+    transmission_notify_enabled: bool | None = None
+    brake_notify_enabled: bool | None = None
+    coolant_notify_enabled: bool | None = None
+    power_steering_notify_enabled: bool | None = None
+    differential_oil_notify_enabled: bool | None = None
 
 
 class VehicleUpdateIntervals(BaseModel):

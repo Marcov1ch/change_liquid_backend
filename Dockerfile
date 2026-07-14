@@ -9,6 +9,7 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --without dev
 
 COPY src/ ./src/
+COPY alembic/ ./alembic/
 
 ENV PYTHONPATH=/app/src
 

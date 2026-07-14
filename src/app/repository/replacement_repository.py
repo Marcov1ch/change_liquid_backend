@@ -38,6 +38,9 @@ class ReplacementRepository:
         self.db.refresh(db_replacement)
 
         result_dict = db_replacement.__dict__.copy()
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('critical_notified', None)
+        result_dict.pop('overdue_notified_at_km', None)
         if result_dict.get('liquid_type'):
             result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
         return Liquid(**result_dict)
@@ -51,6 +54,10 @@ class ReplacementRepository:
             return None
 
         result_dict = db_replacement.__dict__.copy()
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('critical_notified', None)
+        result_dict.pop('overdue_notified_at_km', None)
         if result_dict.get('liquid_type'):
             result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
         return Liquid(**result_dict)
@@ -64,6 +71,8 @@ class ReplacementRepository:
         result = []
         for r in db_replacements:
             result_dict = r.__dict__.copy()
+            result_dict.pop('critical_notified', None)
+            result_dict.pop('overdue_notified_at_km', None)
             if result_dict.get('liquid_type'):
                 result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
             result.append(Liquid(**result_dict))
@@ -83,6 +92,8 @@ class ReplacementRepository:
         result = []
         for r in db_replacements:
             result_dict = r.__dict__.copy()
+            result_dict.pop('critical_notified', None)
+            result_dict.pop('overdue_notified_at_km', None)
             if result_dict.get('liquid_type'):
                 result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
             result.append(Liquid(**result_dict))
@@ -103,9 +114,54 @@ class ReplacementRepository:
             return None
 
         result_dict = db_replacement.__dict__.copy()
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('critical_notified', None)
+        result_dict.pop('overdue_notified_at_km', None)
         if result_dict.get('liquid_type'):
             result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
         return Liquid(**result_dict)
+
+    def get_last_replacement_with_notify(
+        self,
+        vehicle_id: int,
+        liquid_type: LiquidType,
+    ) -> Optional[dict]:
+        """Получить последнюю замену с полями уведомлений."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.liquid_type == liquid_type.value
+        ).order_by(ReplacementDB.km_at_replacement.desc()).first()
+
+        if not db_replacement:
+            return None
+
+        return {
+            "id": db_replacement.id,
+            "km_at_replacement": db_replacement.km_at_replacement,
+            "interval_km": db_replacement.interval_km,
+            "warning_notified": db_replacement.warning_notified,
+            "critical_notified": db_replacement.critical_notified,
+            "overdue_notified_at_km": db_replacement.overdue_notified_at_km,
+        }
+
+    def update_notify_tracking(
+        self,
+        replacement_id: int,
+        warning_notified: bool | None = None,
+        critical_notified: bool | None = None,
+        overdue_notified_at_km: int | None = None,
+    ) -> None:
+        """Обновить флаги отслеживания уведомлений."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.id == replacement_id
+        ).first()
+        if db_replacement:
+            if warning_notified is not None:
+                db_replacement.warning_notified = warning_notified
+            if critical_notified is not None:
+                db_replacement.critical_notified = critical_notified
+            db_replacement.overdue_notified_at_km = overdue_notified_at_km
+            self.db.commit()
 
     def delete(self, replacement_id: int) -> bool:
         """Удалить замену."""

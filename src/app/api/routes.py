@@ -47,6 +47,12 @@ def setup_routes(app: FastAPI) -> None:
         tags=["vehicles"]
     )
     router.add_api_route(
+        "/vehicles/{vehicle_id}/notify",
+        vehicle_handler.update_notify,
+        methods=["PATCH"],
+        tags=["vehicles"]
+    )
+    router.add_api_route(
         "/vehicles/{vehicle_id}/intervals",
         vehicle_handler.update_vehicle_intervals,
         methods=["PATCH"],

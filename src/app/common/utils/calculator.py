@@ -21,9 +21,9 @@ class LiquidCalculator:
     ) -> dict:
         """Рассчитать статус замены."""
         next_km = km_at_replacement + interval_km
-        km_remaining = max(0, next_km - current_km)
+        km_remaining = next_km - current_km
 
-        if km_remaining <= 0:
+        if km_remaining < 0:
             status = StatusEnum.OVERDUE.value
             message = "🔴 ТРЕБУЕТСЯ НЕМЕДЛЕННАЯ ЗАМЕНА!"
         elif km_remaining <= _OVERDUE:

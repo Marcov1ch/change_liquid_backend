@@ -55,6 +55,14 @@ class VehicleDB(Base):  # type: ignore
     coolant_interval_km = Column(Integer, default=60000)
     power_steering_interval_km = Column(Integer, default=60000)
     differential_oil_interval_km = Column(Integer, default=60000)
+
+    oil_notify_enabled = Column(Boolean, default=True)
+    transmission_notify_enabled = Column(Boolean, default=True)
+    brake_notify_enabled = Column(Boolean, default=True)
+    coolant_notify_enabled = Column(Boolean, default=True)
+    power_steering_notify_enabled = Column(Boolean, default=True)
+    differential_oil_notify_enabled = Column(Boolean, default=True)
+
     owner = relationship("UserDB", back_populates="vehicles")
     brand_ref = relationship("BrandDB", lazy="joined")
     model_ref = relationship("ModelDB", lazy="joined")
@@ -74,5 +82,9 @@ class ReplacementDB(Base):  # type: ignore
     replacement_date = Column(Date, nullable=False)
     km_at_replacement = Column(Integer, nullable=False)
     interval_km = Column(Integer, nullable=False)
+
+    warning_notified = Column(Boolean, default=False)
+    critical_notified = Column(Boolean, default=False)
+    overdue_notified_at_km = Column(Integer, nullable=True)
 
     vehicle = relationship("VehicleDB", back_populates="replacements")

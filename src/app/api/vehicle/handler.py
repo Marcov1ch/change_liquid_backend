@@ -7,6 +7,7 @@ from app.api.vehicle.schema import (
     UpdateKMRequest,
     UpdateVehicleData,
     VehicleUpdateIntervals,
+    UpdateVehicleNotify,
 )
 from app.common.enums import StatusEnum
 from app.common.liquid_config import LIQUIDS_CONFIG
@@ -18,6 +19,7 @@ from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import LiquidCalculator
+from app.services.notification_service import check_vehicle_notifications
 
 
 class VehicleHandler:
@@ -44,6 +46,12 @@ class VehicleHandler:
             power_steering_interval_km=vehicle_dto.power_steering_interval_km,
             differential_oil_interval_km=vehicle_dto.differential_oil_interval_km,
             vehicle_status=vehicle_status,
+            oil_notify_enabled=vehicle_dto.oil_notify_enabled,
+            transmission_notify_enabled=vehicle_dto.transmission_notify_enabled,
+            brake_notify_enabled=vehicle_dto.brake_notify_enabled,
+            coolant_notify_enabled=vehicle_dto.coolant_notify_enabled,
+            power_steering_notify_enabled=vehicle_dto.power_steering_notify_enabled,
+            differential_oil_notify_enabled=vehicle_dto.differential_oil_notify_enabled,
         )
 
     def _calc_remaining(
@@ -183,6 +191,9 @@ class VehicleHandler:
                 setattr(existing_dto, field, value)
             updated_dto = vehicle_service.update(existing_dto)
 
+            if "current_km" in updated_data:
+                check_vehicle_notifications(db, vehicle_id)
+
             return self._to_response(updated_dto)
         except HTTPException:
             raise
@@ -208,6 +219,9 @@ class VehicleHandler:
                 vehicle_id=vehicle_id,
                 new_km=request.new_km,
             )
+
+            check_vehicle_notifications(db, vehicle_id)
+
             return self._to_response(vehicle_dto)
         except ValueError as err:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
@@ -240,6 +254,29 @@ class VehicleHandler:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'Failed to update intervals: {err}',
+            )
+
+    async def update_notify(
+        self,
+        vehicle_id: int,
+        request: UpdateVehicleNotify,
+        db: Session = Depends(get_db),
+        current_user: UserDB = Depends(get_current_user),
+    ) -> VehicleResponse:
+        """Обновить настройки уведомлений для авто."""
+        vehicle_service = VehicleService(db)
+        try:
+            existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
+
+            updated_data = request.model_dump(exclude_none=True)
+            for field, value in updated_data.items():
+                setattr(existing_dto, field, value)
+            updated_dto = vehicle_service.update(existing_dto)
+            return self._to_response(updated_dto)
+        except Exception as err:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f'Failed to update notify settings: {err}',
             )
 
     async def delete_vehicle(
