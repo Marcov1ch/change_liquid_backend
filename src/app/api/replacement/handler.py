@@ -2,10 +2,10 @@ from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.api.liquid.schema import (
-    LiquidReplacementResponse,
-    UpdateLiquidReplacementRequest,
-    ReplacementsRequest,
+from app.api.replacement.schema import (
+    ReplacementResponse,
+    UpdateReplacementRequest,
+    ReplacementsBulkRequest,
 )
 from app.db.database import get_db
 from app.db.models import UserDB
@@ -14,29 +14,28 @@ from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.common.enums import StatusEnum
-from app.common.liquid_config import LIQUIDS_CONFIG
-from app.common.utils.calculator import LiquidCalculator
+from app.common.component_config import COMPONENTS_CONFIG
+from app.common.utils.calculator import StatusCalculator
 from app.services.notification_service import check_vehicle_notifications
-
-_LIQUID_FIELD = {cfg.type: cfg.interval_field for cfg in LIQUIDS_CONFIG}
 
 
 class ReplacementHandler:
-    """Хэндлер для операций с заменами жидкостей."""
+    """Хэндлер для операций с заменами."""
+
     def _to_response(
         self,
         replacement_dto: ReplacementDTO,
         vehicle: VehicleDTO,
         is_latest: bool = True,
-    ) -> LiquidReplacementResponse:
+    ) -> ReplacementResponse:
         """Преобразовать DTO в Response с расчётом статуса."""
         if not is_latest:
-            return LiquidReplacementResponse(
+            return ReplacementResponse(
                 id=replacement_dto.id,
                 vehicle_id=replacement_dto.vehicle_id,
-                liquid_type=replacement_dto.liquid_type,
-                liquid_name=replacement_dto.liquid_name,
-                liquid_price=replacement_dto.liquid_price,
+                component_type=replacement_dto.component_type,
+                component_name=replacement_dto.component_name,
+                component_price=replacement_dto.component_price,
                 work_price=replacement_dto.work_price,
                 replacement_date=replacement_dto.replacement_date,
                 km_at_replacement=replacement_dto.km_at_replacement,
@@ -47,19 +46,19 @@ class ReplacementHandler:
                 status_message="📌 Заменено (предыдущая запись)",
             )
 
-        interval = getattr(vehicle, _LIQUID_FIELD[replacement_dto.liquid_type])
-        status_data = LiquidCalculator.calculate_status(
+        interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
+        status_data = StatusCalculator.calculate_status(
             km_at_replacement=replacement_dto.km_at_replacement,
             interval_km=interval,
             current_km=vehicle.current_km,
         )
 
-        return LiquidReplacementResponse(
+        return ReplacementResponse(
             id=replacement_dto.id,
             vehicle_id=replacement_dto.vehicle_id,
-            liquid_type=replacement_dto.liquid_type,
-            liquid_name=replacement_dto.liquid_name,
-            liquid_price=replacement_dto.liquid_price,
+            component_type=replacement_dto.component_type,
+            component_name=replacement_dto.component_name,
+            component_price=replacement_dto.component_price,
             work_price=replacement_dto.work_price,
             replacement_date=replacement_dto.replacement_date,
             km_at_replacement=replacement_dto.km_at_replacement,
@@ -92,10 +91,10 @@ class ReplacementHandler:
     async def create_replacements(
         self,
         vehicle_id: int,
-        request: ReplacementsRequest,
+        request: ReplacementsBulkRequest,
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
-    ) -> List[LiquidReplacementResponse]:
+    ) -> List[ReplacementResponse]:
         """Создать несколько замен сразу (например, при ТО)."""
         replacement_service = ReplacementService(db)
         vehicle_service = VehicleService(db)
@@ -129,7 +128,7 @@ class ReplacementHandler:
         vehicle_id: int,
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
-    ) -> List[LiquidReplacementResponse]:
+    ) -> List[ReplacementResponse]:
         """Получить все замены для автомобиля с расчётом статусов."""
         vehicle_service = VehicleService(db)
         replacement_service = ReplacementService(db)
@@ -142,13 +141,13 @@ class ReplacementHandler:
 
             latest_per_type: dict[str, int] = {}
             for r in replacements_dto:
-                prev = latest_per_type.get(r.liquid_type.value)
+                prev = latest_per_type.get(r.component_type.value)
                 if prev is None or r.km_at_replacement > prev:
-                    latest_per_type[r.liquid_type.value] = r.km_at_replacement
+                    latest_per_type[r.component_type.value] = r.km_at_replacement
 
             result = []
             for r in replacements_dto:
-                is_latest = latest_per_type.get(r.liquid_type.value) == r.km_at_replacement
+                is_latest = latest_per_type.get(r.component_type.value) == r.km_at_replacement
                 result.append(self._to_response(r, vehicle, is_latest))
             return result
         except HTTPException:
@@ -164,7 +163,7 @@ class ReplacementHandler:
         replacement_id: int,
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
-    ) -> LiquidReplacementResponse:
+    ) -> ReplacementResponse:
         """Получить конкретную замену по ID."""
         replacement_service = ReplacementService(db)
         vehicle_service = VehicleService(db)
@@ -192,10 +191,10 @@ class ReplacementHandler:
     async def update_replacement(
         self,
         replacement_id: int,
-        request: UpdateLiquidReplacementRequest,
+        request: UpdateReplacementRequest,
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
-    ) -> LiquidReplacementResponse:
+    ) -> ReplacementResponse:
         """Обновить запись о замене."""
         replacement_service = ReplacementService(db)
         vehicle_service = VehicleService(db)

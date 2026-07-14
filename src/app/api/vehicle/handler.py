@@ -2,7 +2,7 @@ from fastapi import HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
 from app.api.vehicle.schema import (
-    VehicleRequest,
+    VehicleCreateRequest,
     VehicleResponse,
     UpdateKMRequest,
     UpdateVehicleData,
@@ -10,7 +10,7 @@ from app.api.vehicle.schema import (
     UpdateVehicleNotify,
 )
 from app.common.enums import StatusEnum
-from app.common.liquid_config import LIQUIDS_CONFIG
+from app.common.component_config import COMPONENTS_CONFIG
 from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
 from app.db.database import get_db
 from app.db.models import UserDB
@@ -18,7 +18,7 @@ from app.auth.jwt import get_current_user
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
-from app.common.utils.calculator import LiquidCalculator
+from app.common.utils.calculator import StatusCalculator
 from app.services.notification_service import check_vehicle_notifications
 
 
@@ -31,6 +31,7 @@ class VehicleHandler:
         vehicle_status: str = StatusEnum.UNKNOWN.value,
     ) -> VehicleResponse:
         """Преобразование VehicleDTO в VehicleResponse."""
+        vehicle_status_value: str = vehicle_status
         return VehicleResponse(
             id=vehicle_dto.id,
             brand=vehicle_dto.brand,
@@ -39,19 +40,9 @@ class VehicleHandler:
             year=vehicle_dto.year,
             current_km=vehicle_dto.current_km,
             is_active=vehicle_dto.is_active,
-            oil_interval_km=vehicle_dto.oil_interval_km,
-            transmission_interval_km=vehicle_dto.transmission_interval_km,
-            brake_interval_km=vehicle_dto.brake_interval_km,
-            coolant_interval_km=vehicle_dto.coolant_interval_km,
-            power_steering_interval_km=vehicle_dto.power_steering_interval_km,
-            differential_oil_interval_km=vehicle_dto.differential_oil_interval_km,
-            vehicle_status=vehicle_status,
-            oil_notify_enabled=vehicle_dto.oil_notify_enabled,
-            transmission_notify_enabled=vehicle_dto.transmission_notify_enabled,
-            brake_notify_enabled=vehicle_dto.brake_notify_enabled,
-            coolant_notify_enabled=vehicle_dto.coolant_notify_enabled,
-            power_steering_notify_enabled=vehicle_dto.power_steering_notify_enabled,
-            differential_oil_notify_enabled=vehicle_dto.differential_oil_notify_enabled,
+            intervals=vehicle_dto.intervals.copy(),
+            notify_flags=vehicle_dto.notify_flags.copy(),
+            vehicle_status=vehicle_status_value,
         )
 
     def _calc_remaining(
@@ -63,7 +54,7 @@ class VehicleHandler:
         """Рассчитать остаток км до замены."""
         if last_replacement:
             next_km = last_replacement.km_at_replacement + interval_km
-            return max(0, next_km - current_km)  # type: ignore[no-any-return]
+            return max(0, next_km - current_km)
         return None
 
     def _enrich_with_remaining(
@@ -73,11 +64,12 @@ class VehicleHandler:
         replacement_service: ReplacementService,
     ) -> VehicleResponse:
         """Обогатить ответ остатками км до замен."""
-        for config in LIQUIDS_CONFIG:
-            last = replacement_service.get_last_for_vehicle_and_liquid(vehicle_dto.id, config.type)
-            interval = getattr(vehicle_dto, config.interval_field)
-            remaining = self._calc_remaining(last, interval, vehicle_dto.current_km)
-            setattr(response, config.remaining_field, remaining)
+        for config in COMPONENTS_CONFIG:
+            last = replacement_service.get_last_for_vehicle_and_component(vehicle_dto.id, config.type)
+            interval = vehicle_dto.intervals.get(config.type.value)
+            if interval is not None:
+                remaining = self._calc_remaining(last, interval, vehicle_dto.current_km)
+                response.km_remaining[config.type.value] = remaining
         return response
 
     def _build_vehicle_response(
@@ -89,9 +81,8 @@ class VehicleHandler:
         response = self._to_response(vehicle_dto)
         response = self._enrich_with_remaining(response, vehicle_dto, replacement_service)
 
-        # Получаем статус автомобиля
         replacements = replacement_service.get_by_vehicle(vehicle_dto.id)
-        worst_status = LiquidCalculator.get_vehicle_status(vehicle_dto, replacements)
+        worst_status = StatusCalculator.get_vehicle_status(vehicle_dto, replacements)
         response.vehicle_status = worst_status
 
         return response
@@ -149,7 +140,7 @@ class VehicleHandler:
 
     async def create_vehicle(
         self,
-        request: VehicleRequest,
+        request: VehicleCreateRequest,
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
     ) -> VehicleResponse:
@@ -186,12 +177,24 @@ class VehicleHandler:
         try:
             existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-            updated_data = request.model_dump(exclude_none=True)
-            for field, value in updated_data.items():
-                setattr(existing_dto, field, value)
+            if request.brand is not None:
+                existing_dto.brand = request.brand
+            if request.model is not None:
+                existing_dto.model = request.model
+            if request.plate_number is not None:
+                existing_dto.plate_number = request.plate_number
+            if request.year is not None:
+                existing_dto.year = request.year
+            if request.current_km is not None:
+                existing_dto.current_km = request.current_km
+            if request.intervals is not None:
+                existing_dto.intervals.update(request.intervals)
+            if request.notify_flags is not None:
+                existing_dto.notify_flags.update(request.notify_flags)
+
             updated_dto = vehicle_service.update(existing_dto)
 
-            if "current_km" in updated_data:
+            if request.current_km is not None:
                 check_vehicle_notifications(db, vehicle_id)
 
             return self._to_response(updated_dto)
@@ -240,14 +243,14 @@ class VehicleHandler:
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
     ) -> VehicleResponse:
-        """Обновить интервалы замены жидкостей."""
+        """Обновить интервалы замен."""
         vehicle_service = VehicleService(db)
         try:
             existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-            updated_data = request.model_dump(exclude_none=True)
-            for field, value in updated_data.items():
-                setattr(existing_dto, field, value)
+            if request.intervals is not None:
+                existing_dto.intervals.update(request.intervals)
+
             updated_dto = vehicle_service.update(existing_dto)
             return self._to_response(updated_dto)
         except Exception as err:
@@ -268,9 +271,9 @@ class VehicleHandler:
         try:
             existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-            updated_data = request.model_dump(exclude_none=True)
-            for field, value in updated_data.items():
-                setattr(existing_dto, field, value)
+            if request.notify_flags is not None:
+                existing_dto.notify_flags.update(request.notify_flags)
+
             updated_dto = vehicle_service.update(existing_dto)
             return self._to_response(updated_dto)
         except Exception as err:

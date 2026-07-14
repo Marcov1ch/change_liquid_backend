@@ -1,18 +1,18 @@
 from sqlalchemy.orm import Session
 from app.db.models import ReplacementDB
-from app.common.models.liquid import Liquid
-from app.common.enums import LiquidType
+from app.common.models.replacement import Replacement
+from app.common.enums import ComponentType
 from typing import List, Optional
 
 
 class ReplacementRepository:
-    """Репозиторий для работы с заменами жидкостей."""
+    """Репозиторий для работы с заменами в БД."""
 
     def __init__(self, db: Session):
         self.db = db
 
-    def save(self, replacement: Liquid) -> Liquid:
-        """Сохранить или обновить замену."""
+    def save(self, replacement: Replacement) -> Replacement:
+        """Создать или обновить запись о замене."""
         if replacement.id:
             db_replacement = self.db.query(ReplacementDB).filter(
                 ReplacementDB.id == replacement.id
@@ -21,16 +21,14 @@ class ReplacementRepository:
                 raise ValueError(f'Replacement with id {replacement.id} not found')
 
             update_data = replacement.model_dump(exclude={'id'})
-            # Преобразуем Enum в строку
-            if 'liquid_type' in update_data and update_data['liquid_type']:
-                update_data['liquid_type'] = update_data['liquid_type'].value
+            if 'component_type' in update_data and update_data['component_type']:
+                update_data['component_type'] = update_data['component_type'].value
             for key, value in update_data.items():
                 setattr(db_replacement, key, value)
         else:
             replacement_data = replacement.model_dump(exclude={'id'})
-            # Преобразуем Enum в строку
-            if replacement_data.get('liquid_type'):
-                replacement_data['liquid_type'] = replacement_data['liquid_type'].value
+            if replacement_data.get('component_type'):
+                replacement_data['component_type'] = replacement_data['component_type'].value
             db_replacement = ReplacementDB(**replacement_data)
             self.db.add(db_replacement)
 
@@ -41,12 +39,12 @@ class ReplacementRepository:
         result_dict.pop('warning_notified', None)
         result_dict.pop('critical_notified', None)
         result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('liquid_type'):
-            result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
-        return Liquid(**result_dict)
+        if result_dict.get('component_type'):
+            result_dict['component_type'] = ComponentType(result_dict['component_type'])
+        return Replacement(**result_dict)
 
-    def find_by_id(self, replacement_id: int) -> Optional[Liquid]:
-        """Найти замену по ID."""
+    def find_by_id(self, replacement_id: int) -> Optional[Replacement]:
+        """Найти замену по id."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.id == replacement_id
         ).first()
@@ -55,14 +53,13 @@ class ReplacementRepository:
 
         result_dict = db_replacement.__dict__.copy()
         result_dict.pop('warning_notified', None)
-        result_dict.pop('warning_notified', None)
         result_dict.pop('critical_notified', None)
         result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('liquid_type'):
-            result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
-        return Liquid(**result_dict)
+        if result_dict.get('component_type'):
+            result_dict['component_type'] = ComponentType(result_dict['component_type'])
+        return Replacement(**result_dict)
 
-    def find_by_vehicle_id(self, vehicle_id: int) -> List[Liquid]:
+    def find_by_vehicle_id(self, vehicle_id: int) -> List[Replacement]:
         """Найти все замены для автомобиля."""
         db_replacements = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id
@@ -73,20 +70,20 @@ class ReplacementRepository:
             result_dict = r.__dict__.copy()
             result_dict.pop('critical_notified', None)
             result_dict.pop('overdue_notified_at_km', None)
-            if result_dict.get('liquid_type'):
-                result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
-            result.append(Liquid(**result_dict))
+            if result_dict.get('component_type'):
+                result_dict['component_type'] = ComponentType(result_dict['component_type'])
+            result.append(Replacement(**result_dict))
         return result
 
-    def find_by_vehicle_and_liquid(
+    def find_by_vehicle_and_component(
             self,
             vehicle_id: int,
-            liquid_type: LiquidType
-    ) -> List[Liquid]:
-        """Найти замены конкретной жидкости для авто."""
+            component_type: ComponentType
+    ) -> List[Replacement]:
+        """Найти замены для автомобиля по типу компонента."""
         db_replacements = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
-            ReplacementDB.liquid_type == liquid_type.value
+            ReplacementDB.component_type == component_type.value
         ).all()
 
         result = []
@@ -94,20 +91,20 @@ class ReplacementRepository:
             result_dict = r.__dict__.copy()
             result_dict.pop('critical_notified', None)
             result_dict.pop('overdue_notified_at_km', None)
-            if result_dict.get('liquid_type'):
-                result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
-            result.append(Liquid(**result_dict))
+            if result_dict.get('component_type'):
+                result_dict['component_type'] = ComponentType(result_dict['component_type'])
+            result.append(Replacement(**result_dict))
         return result
 
     def get_last_replacement(
             self,
             vehicle_id: int,
-            liquid_type: LiquidType
-    ) -> Optional[Liquid]:
-        """Получить последнюю замену для жидкости."""
+            component_type: ComponentType
+    ) -> Optional[Replacement]:
+        """Получить последнюю замену для компонента автомобиля."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
-            ReplacementDB.liquid_type == liquid_type.value
+            ReplacementDB.component_type == component_type.value
         ).order_by(ReplacementDB.km_at_replacement.desc()).first()
 
         if not db_replacement:
@@ -117,19 +114,19 @@ class ReplacementRepository:
         result_dict.pop('warning_notified', None)
         result_dict.pop('critical_notified', None)
         result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('liquid_type'):
-            result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
-        return Liquid(**result_dict)
+        if result_dict.get('component_type'):
+            result_dict['component_type'] = ComponentType(result_dict['component_type'])
+        return Replacement(**result_dict)
 
     def get_last_replacement_with_notify(
         self,
         vehicle_id: int,
-        liquid_type: LiquidType,
+        component_type: ComponentType,
     ) -> Optional[dict]:
-        """Получить последнюю замену с полями уведомлений."""
+        """Получить последнюю замену с флагами уведомлений для проверки."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
-            ReplacementDB.liquid_type == liquid_type.value
+            ReplacementDB.component_type == component_type.value
         ).order_by(ReplacementDB.km_at_replacement.desc()).first()
 
         if not db_replacement:
@@ -151,7 +148,7 @@ class ReplacementRepository:
         critical_notified: bool | None = None,
         overdue_notified_at_km: int | None = None,
     ) -> None:
-        """Обновить флаги отслеживания уведомлений."""
+        """Обновить флаги отслеживания уведомлений для замены."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.id == replacement_id
         ).first()
@@ -164,7 +161,7 @@ class ReplacementRepository:
             self.db.commit()
 
     def delete(self, replacement_id: int) -> bool:
-        """Удалить замену."""
+        """Удалить запись о замене."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.id == replacement_id
         ).first()
@@ -174,14 +171,14 @@ class ReplacementRepository:
             return True
         return False
 
-    def get_all(self) -> List[Liquid]:
+    def get_all(self) -> List[Replacement]:
         """Получить все замены."""
         db_replacements = self.db.query(ReplacementDB).all()
 
         result = []
         for r in db_replacements:
             result_dict = r.__dict__.copy()
-            if result_dict.get('liquid_type'):
-                result_dict['liquid_type'] = LiquidType(result_dict['liquid_type'])
-            result.append(Liquid(**result_dict))
+            if result_dict.get('component_type'):
+                result_dict['component_type'] = ComponentType(result_dict['component_type'])
+            result.append(Replacement(**result_dict))
         return result

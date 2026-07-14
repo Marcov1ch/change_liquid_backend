@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter
 
 from app.api.vehicle.handler import vehicle_handler
-from app.api.liquid.handler import replacement_handler
+from app.api.replacement.handler import replacement_handler
 from app.api.enums.handler import enums_handler
 
 
@@ -117,8 +117,14 @@ def setup_routes(app: FastAPI) -> None:
         tags=["enums"]
     )
     router.add_api_route(
-        "/enums/liquids",
-        enums_handler.get_liquids,
+        "/enums/components",
+        enums_handler.get_components,
+        methods=["GET"],
+        tags=["enums"]
+    )
+    router.add_api_route(
+        "/enums/component-configs",
+        enums_handler.get_component_configs,
         methods=["GET"],
         tags=["enums"]
     )

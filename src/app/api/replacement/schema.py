@@ -1,12 +1,12 @@
 from datetime import date
 from pydantic import BaseModel, Field
 
-from app.common.schemas.base_liquid import LiquidBase
-from app.common.enums import LiquidType, StatusEnum
+from app.common.schemas.base_replacement import ReplacementBase
+from app.common.enums import ComponentType, StatusEnum
 
 
-class LiquidReplacementRequest(LiquidBase):
-    """Запрос на создание замены жидкости."""
+class ReplacementCreateRequest(ReplacementBase):
+    """Запрос на создание замены."""
     replacement_date: date = Field(
         ...,
         description='Дата замены',
@@ -20,7 +20,7 @@ class LiquidReplacementRequest(LiquidBase):
     )
 
 
-class LiquidReplacementResponse(LiquidBase):
+class ReplacementResponse(ReplacementBase):
     """Ответ с данными о замене."""
     id: int = Field(
         ...,
@@ -60,19 +60,19 @@ class LiquidReplacementResponse(LiquidBase):
     )
 
 
-class UpdateLiquidReplacementRequest(LiquidBase):
+class UpdateReplacementRequest(ReplacementBase):
     """Обновление записи о замене."""
-    liquid_type: LiquidType | None = None
-    liquid_name: str | None = None
+    component_type: ComponentType | None = None
+    component_name: str | None = None
     replacement_date: date | None = None
     km_at_replacement: int | None = Field(None, ge=0)
 
 
-class ReplacementsRequest(BaseModel):
+class ReplacementsBulkRequest(BaseModel):
     """Массовое создание замен."""
-    replacements: list[LiquidReplacementRequest] = Field(
+    replacements: list[ReplacementCreateRequest] = Field(
         ...,
-        description='Список замен жидкостей',
+        description='Список замен',
         min_length=1,
         max_length=10,
     )

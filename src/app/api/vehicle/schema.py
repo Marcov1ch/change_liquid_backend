@@ -2,16 +2,25 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.common.schemas.base_vehicle import VehicleBase, VehicleIntervals
-from app.common.schemas.vehicle_notify import VehicleNotify
+from app.common.schemas.base_vehicle import VehicleBase
 
 
-class VehicleRequest(VehicleBase, VehicleIntervals, VehicleNotify):
+class VehicleCreateRequest(VehicleBase):
     """Модель запроса создания авто."""
+    intervals: dict[str, int] = Field(
+        default_factory=dict,
+        description='Интервалы замен по компонентам',
+        examples=[{"engine_oil": 7000, "transmission_oil": 60000}],
+    )
+    notify_flags: dict[str, bool] = Field(
+        default_factory=dict,
+        description='Настройки уведомлений по компонентам',
+        examples=[{"engine_oil": True, "transmission_oil": True}],
+    )
 
 
-class VehicleResponse(VehicleIntervals, VehicleBase, VehicleNotify):
-    """Модель ответа с данными авто."""
+class VehicleResponse(VehicleBase):
+    """Ответ с данными авто."""
     id: int = Field(
         ...,
         description='id автомобиля',
@@ -24,29 +33,17 @@ class VehicleResponse(VehicleIntervals, VehicleBase, VehicleNotify):
         ...,
         description='Статус авто по заменам',
     )
-    oil_km_remaining: int | None = Field(
-        None,
-        description='Остаток км до замены масла',
+    intervals: dict[str, int] = Field(
+        default_factory=dict,
+        description='Интервалы замен по компонентам',
     )
-    transmission_km_remaining: int | None = Field(
-        None,
-        description='Остаток км до замены масла АКПП',
+    notify_flags: dict[str, bool] = Field(
+        default_factory=dict,
+        description='Настройки уведомлений',
     )
-    brake_km_remaining: int | None = Field(
-        None,
-        description='Остаток км до замены тормозной жидкости',
-    )
-    coolant_km_remaining: int | None = Field(
-        None,
-        description='Остаток км до замены антифриза',
-    )
-    power_steering_km_remaining: int | None = Field(
-        None,
-        description='Остаток км до замены жидкости ГУР',
-    )
-    differential_oil_km_remaining: int | None = Field(
-        None,
-        description='Остаток км до замены масла в редукторе',
+    km_remaining: dict[str, int | None] = Field(
+        default_factory=dict,
+        description='Остаток км до замены по каждому компоненту',
     )
 
 
@@ -67,18 +64,14 @@ class UpdateVehicleData(BaseModel):
     plate_number: str | None = None
     year: int | None = Field(None, ge=1960, le=2026)
     current_km: int | None = Field(None, ge=0)
-    oil_interval_km: int | None = Field(None, ge=1000)
-    transmission_interval_km: int | None = Field(None, ge=10000)
-    brake_interval_km: int | None = Field(None, ge=10000)
-    coolant_interval_km: int | None = Field(None, ge=10000)
-    power_steering_interval_km: int | None = Field(None, ge=10000)
-    differential_oil_interval_km: int | None = Field(None, ge=10000)
-    oil_notify_enabled: bool | None = None
-    transmission_notify_enabled: bool | None = None
-    brake_notify_enabled: bool | None = None
-    coolant_notify_enabled: bool | None = None
-    power_steering_notify_enabled: bool | None = None
-    differential_oil_notify_enabled: bool | None = None
+    intervals: dict[str, int] | None = Field(
+        None,
+        description='Интервалы замен для обновления',
+    )
+    notify_flags: dict[str, bool] | None = Field(
+        None,
+        description='Настройки уведомлений для обновления',
+    )
 
     @field_validator('plate_number')
     @classmethod
@@ -100,21 +93,17 @@ class UpdateVehicleData(BaseModel):
         return cleaned
 
 
-class UpdateVehicleNotify(BaseModel):
-    """Обновление настроек уведомлений (PATCH — все поля опциональны)."""
-    oil_notify_enabled: bool | None = None
-    transmission_notify_enabled: bool | None = None
-    brake_notify_enabled: bool | None = None
-    coolant_notify_enabled: bool | None = None
-    power_steering_notify_enabled: bool | None = None
-    differential_oil_notify_enabled: bool | None = None
-
-
 class VehicleUpdateIntervals(BaseModel):
     """Обновление интервалов замен (PATCH — все поля опциональны)."""
-    oil_interval_km: int | None = Field(None, ge=1000)
-    transmission_interval_km: int | None = Field(None, ge=10000)
-    brake_interval_km: int | None = Field(None, ge=10000)
-    coolant_interval_km: int | None = Field(None, ge=10000)
-    power_steering_interval_km: int | None = Field(None, ge=10000)
-    differential_oil_interval_km: int | None = Field(None, ge=10000)
+    intervals: dict[str, int] | None = Field(
+        None,
+        description='Интервалы замен для обновления',
+    )
+
+
+class UpdateVehicleNotify(BaseModel):
+    """Обновление настроек уведомлений (PATCH — все поля опциональны)."""
+    notify_flags: dict[str, bool] | None = Field(
+        None,
+        description='Настройки уведомлений для обновления',
+    )

@@ -1,8 +1,8 @@
 from enum import Enum
 
 
-class LiquidType(Enum):
-    """Enum жидкостей."""
+class ComponentType(Enum):
+    """Типы отслеживаемых компонентов (жидкости, фильтры, свечи и т.д.)."""
     ENGINE_OIL = 'engine_oil'
     TRANSMISSION_OIL = "transmission_oil"
     COOLANT = "coolant"
@@ -12,7 +12,7 @@ class LiquidType(Enum):
 
 
 class StatusEnum(Enum):
-    """Статусы по заменам жидкостей."""
+    """Статусы по заменам."""
     OVERDUE = "overdue"
     CRITICAL = "critical"
     WARNING = "warning"

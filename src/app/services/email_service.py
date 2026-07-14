@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 
 @dataclass
-class LiquidNotificationItem:
-    liquid_name: str
-    liquid_name_genitive: str
+class ComponentNotificationItem:
+    component_name: str
+    component_name_genitive: str
     km_remaining: int
     status: str
 
@@ -47,6 +47,7 @@ def _send_email(to_email: str, subject: str, body: str) -> None:
 
 
 def send_reset_password_email(to_email: str, token: str) -> None:
+    """Отправить письмо для сброса пароля."""
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset-password?token={token}"
 
@@ -62,7 +63,7 @@ def send_reset_password_email(to_email: str, token: str) -> None:
     _send_email(to_email, subject, body)
 
 
-def _pick_worst_status(items: list[LiquidNotificationItem]) -> str:
+def _pick_worst_status(items: list[ComponentNotificationItem]) -> str:
     return max(items, key=lambda x: STATUS_ORDER.get(x.status, 0)).status
 
 
@@ -78,31 +79,32 @@ def send_grouped_notification_email(
     brand: str,
     model: str,
     plate_number: str,
-    items: list[LiquidNotificationItem],
+    items: list[ComponentNotificationItem],
 ) -> None:
+    """Отправить email с группировкой всех компонентов, требующих замены."""
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
     worst = _pick_worst_status(items)
     emoji, header_text = STATUS_HEADERS.get(worst, ("🟡", "Пора заменить"))
 
-    liq_items = "".join(
-        f"<li><strong>{item.liquid_name_genitive}</strong> — {_format_km(item.km_remaining)}</li>"
+    comp_items = "".join(
+        f"<li><strong>{item.component_name_genitive}</strong> — {_format_km(item.km_remaining)}</li>"
         for item in items
     )
 
-    single_liquid = items[0].liquid_name
-    liquid_label = single_liquid if len(items) == 1 else f"{len(items)} жидкостей"
-    subject = f"Car Liquid Tracker — {liquid_label}: требуется замена"
+    first = items[0].component_name
+    label = first if len(items) == 1 else f"{len(items)} компонентов"
+    subject = f"Car Liquid Tracker — {label}: требуется замена"
 
     body = f"""
     <h2>{emoji} {header_text}</h2>
     <p>Здравствуйте, <strong>{username}</strong>!</p>
     <p>По данным системы, на автомобиле <strong>{brand} {model}</strong> ({plate_number})<br>
     требуется замена:</p>
-    <ul>{liq_items}</ul>
+    <ul>{comp_items}</ul>
     <hr>
     <p style="font-size: 12px; color: #888;">
-        Если вы не хотите получать уведомления по какой-либо жидкости,
+        Если вы не хотите получать уведомления,
         отключите их в настройках автомобиля:
         <br>
         <a href="{frontend_url}/">Перейти в настройки</a>
@@ -110,20 +112,3 @@ def send_grouped_notification_email(
     """
 
     _send_email(to_email, subject, body)
-
-
-def send_liquid_notification_email(
-    to_email: str,
-    username: str,
-    brand: str,
-    model: str,
-    plate_number: str,
-    liquid_name: str,
-    liquid_name_genitive: str,
-    km_remaining: int,
-    status: str,
-) -> None:
-    item = LiquidNotificationItem(liquid_name, liquid_name_genitive, km_remaining, status)
-    send_grouped_notification_email(
-        to_email, username, brand, model, plate_number, [item],
-    )

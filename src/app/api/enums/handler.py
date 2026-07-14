@@ -6,10 +6,13 @@ from app.api.enums.schema import (
     BrandResponse,
     ModelsResponse,
     ModelResponse,
-    LiquidsResponse,
-    LiquidResponse,
+    ComponentsResponse,
+    ComponentItemResponse,
+    ComponentConfigsResponse,
+    ComponentConfigResponse,
 )
-from app.common.enums import LiquidType
+from app.common.enums import ComponentType
+from app.common.component_config import COMPONENTS_CONFIG
 from app.db.database import get_db
 from app.repository.enum_repository import EnumRepository
 
@@ -33,13 +36,25 @@ class EnumsHandler:
             models_list = [ModelResponse(value=m.name, label=m.name) for m in models]
         return ModelsResponse(models=models_list)
 
-    async def get_liquids(self) -> LiquidsResponse:
-        """Получить список типов жидкостей."""
-        liquids = [
-            LiquidResponse(value=liquid.value, label=liquid.value.replace('_', ' ').title())
-            for liquid in LiquidType
+    async def get_components(self) -> ComponentsResponse:
+        """Получить список типов компонентов."""
+        components = [
+            ComponentItemResponse(value=component.value, label=component.value.replace('_', ' ').title())
+            for component in ComponentType
         ]
-        return LiquidsResponse(liquids=liquids)
+        return ComponentsResponse(components=components)
+
+    async def get_component_configs(self) -> ComponentConfigsResponse:
+        """Получить конфигурации всех отслеживаемых компонентов."""
+        configs = [
+            ComponentConfigResponse(
+                key=cfg.type.value,
+                name=cfg.name,
+                default_interval=5000,
+            )
+            for cfg in COMPONENTS_CONFIG
+        ]
+        return ComponentConfigsResponse(configs=configs)
 
 
 enums_handler = EnumsHandler()
