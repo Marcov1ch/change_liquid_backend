@@ -23,6 +23,12 @@ class VehicleDTO:
     coolant_interval_km: int
     power_steering_interval_km: int
     differential_oil_interval_km: int
+    oil_notify_enabled: bool = True
+    transmission_notify_enabled: bool = True
+    brake_notify_enabled: bool = True
+    coolant_notify_enabled: bool = True
+    power_steering_notify_enabled: bool = True
+    differential_oil_notify_enabled: bool = True
 
 
 @dataclass

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.api.routes import setup_routes
 from app.db.database import init_db
+from app.db.migrate import run_migrations
 from app.auth.handler import router as auth_router
 
 
@@ -12,6 +13,7 @@ def create_app() -> FastAPI:
 
     load_dotenv()
 
+    run_migrations()
     init_db()
 
     app = FastAPI(

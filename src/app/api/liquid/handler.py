@@ -16,6 +16,7 @@ from app.services.vehicle_service import VehicleService
 from app.common.enums import StatusEnum
 from app.common.liquid_config import LIQUIDS_CONFIG
 from app.common.utils.calculator import LiquidCalculator
+from app.services.notification_service import check_vehicle_notifications
 
 _LIQUID_FIELD = {cfg.type: cfg.interval_field for cfg in LIQUIDS_CONFIG}
 
@@ -107,6 +108,8 @@ class ReplacementHandler:
                 replacement_dto = replacement_service.create(vehicle_id, replacement_request)
                 vehicle = vehicle_service.get_active_by_id(vehicle_id)
                 results.append(self._to_response(replacement_dto, vehicle))
+
+            check_vehicle_notifications(db, vehicle_id)
             return results
         except ValueError as err:
             raise HTTPException(
@@ -211,6 +214,9 @@ class ReplacementHandler:
             replacement_dto = replacement_service.update(replacement_id, **update_data)
 
             vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
+
+            check_vehicle_notifications(db, replacement_dto.vehicle_id)
+
             return self._to_response(replacement_dto, vehicle)
         except ValueError as err:
             raise HTTPException(

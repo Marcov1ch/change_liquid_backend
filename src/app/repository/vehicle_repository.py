@@ -27,6 +27,12 @@ class VehicleRepository:
             coolant_interval_km=db_vehicle.coolant_interval_km,
             power_steering_interval_km=db_vehicle.power_steering_interval_km,
             differential_oil_interval_km=db_vehicle.differential_oil_interval_km,
+            oil_notify_enabled=db_vehicle.oil_notify_enabled,
+            transmission_notify_enabled=db_vehicle.transmission_notify_enabled,
+            brake_notify_enabled=db_vehicle.brake_notify_enabled,
+            coolant_notify_enabled=db_vehicle.coolant_notify_enabled,
+            power_steering_notify_enabled=db_vehicle.power_steering_notify_enabled,
+            differential_oil_notify_enabled=db_vehicle.differential_oil_notify_enabled,
         )
 
     def save(self, vehicle: Vehicle) -> Vehicle:
@@ -113,3 +119,39 @@ class VehicleRepository:
             VehicleDB.owner_id == user_id
         ).all()
         return [self._to_domain(v) for v in db_vehicles]
+
+    def find_all_active_with_owner(self) -> list[dict]:
+        """Найти все активные авто с email и username владельца.
+        Используется сервисом уведомлений.
+        """
+        from sqlalchemy.orm import joinedload
+        db_vehicles = self.db.query(VehicleDB).options(
+            joinedload(VehicleDB.owner),
+            joinedload(VehicleDB.brand_ref),
+            joinedload(VehicleDB.model_ref),
+        ).filter(VehicleDB.is_active).all()
+
+        result = []
+        for v in db_vehicles:
+            result.append({
+                "id": v.id,
+                "brand": v.brand_ref.name,
+                "model": v.model_ref.name,
+                "plate_number": v.plate_number,
+                "current_km": v.current_km,
+                "oil_interval_km": v.oil_interval_km,
+                "transmission_interval_km": v.transmission_interval_km,
+                "brake_interval_km": v.brake_interval_km,
+                "coolant_interval_km": v.coolant_interval_km,
+                "power_steering_interval_km": v.power_steering_interval_km,
+                "differential_oil_interval_km": v.differential_oil_interval_km,
+                "oil_notify_enabled": v.oil_notify_enabled,
+                "transmission_notify_enabled": v.transmission_notify_enabled,
+                "brake_notify_enabled": v.brake_notify_enabled,
+                "coolant_notify_enabled": v.coolant_notify_enabled,
+                "power_steering_notify_enabled": v.power_steering_notify_enabled,
+                "differential_oil_notify_enabled": v.differential_oil_notify_enabled,
+                "owner_email": v.owner.email if v.owner else "",
+                "owner_username": v.owner.username if v.owner else "",
+            })
+        return result
