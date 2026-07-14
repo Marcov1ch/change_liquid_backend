@@ -1,17 +1,15 @@
 from typing import Final
 
-from app.common.enums import StatusEnum, LiquidType
-from app.common.liquid_config import LIQUIDS_CONFIG
+from app.common.enums import StatusEnum, ComponentType
 from app.services.dto import VehicleDTO, ReplacementDTO
 
 _OVERDUE: Final[int] = 250
 _CRITICAL: Final[int] = 500
 _WARNING: Final[int] = 1000
-_LIQUID_FIELD: dict[LiquidType, str] = {cfg.type: cfg.interval_field for cfg in LIQUIDS_CONFIG}
 
 
-class LiquidCalculator:
-    """Калькулятор статусов замен жидкостей."""
+class StatusCalculator:
+    """Калькулятор статусов замен."""
 
     @staticmethod
     def calculate_status(
@@ -55,15 +53,17 @@ class LiquidCalculator:
         if not replacements:
             return StatusEnum.UNKNOWN.value  # type: ignore[no-any-return]
 
-        last_by_type: dict[LiquidType, ReplacementDTO] = {}
+        last_by_type: dict[ComponentType, ReplacementDTO] = {}
         for r in replacements:
-            if r.liquid_type not in last_by_type or r.km_at_replacement > last_by_type[r.liquid_type].km_at_replacement:
-                last_by_type[r.liquid_type] = r
+            if r.component_type not in last_by_type or r.km_at_replacement > last_by_type[r.component_type].km_at_replacement:
+                last_by_type[r.component_type] = r
 
         has_warning = False
         for r in last_by_type.values():
-            interval = getattr(vehicle_dto, _LIQUID_FIELD[r.liquid_type])
-            status = LiquidCalculator.calculate_status(
+            interval = vehicle_dto.intervals.get(r.component_type.value)
+            if interval is None:
+                continue
+            status = StatusCalculator.calculate_status(
                 r.km_at_replacement,
                 interval,
                 vehicle_dto.current_km)['status']

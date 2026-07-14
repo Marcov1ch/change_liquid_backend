@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 
 from app.common.schemas.base_vehicle import VehicleBase
-from app.common.models.vehicle import Vehicle
 from app.repository.enum_repository import EnumRepository
 from app.repository.vehicle_repository import VehicleRepository
 from app.services.dto import VehicleDTO
@@ -29,7 +28,14 @@ class VehicleService:
         if not model:
             raise ValueError(f'Model "{vehicle_data.model}" not found for brand "{vehicle_data.brand}"')
 
-        vehicle = Vehicle(
+        intervals = {}
+        notify_flags = {}
+        if hasattr(vehicle_data, 'intervals'):
+            intervals = vehicle_data.intervals
+        if hasattr(vehicle_data, 'notify_flags'):
+            notify_flags = vehicle_data.notify_flags
+
+        dto = VehicleDTO(
             id=None,
             brand=vehicle_data.brand,
             model=vehicle_data.model,
@@ -38,85 +44,50 @@ class VehicleService:
             plate_number=vehicle_data.plate_number,
             year=vehicle_data.year,
             current_km=vehicle_data.current_km,
-            oil_interval_km=vehicle_data.oil_interval_km,
-            transmission_interval_km=vehicle_data.transmission_interval_km,
-            brake_interval_km=vehicle_data.brake_interval_km,
-            coolant_interval_km=vehicle_data.coolant_interval_km,
-            power_steering_interval_km=vehicle_data.power_steering_interval_km,
-            differential_oil_interval_km=vehicle_data.differential_oil_interval_km,
-            owner_id=user_id,
             is_active=True,
+            owner_id=user_id,
+            intervals=intervals,
+            notify_flags=notify_flags,
         )
-        saved = self.repository.save(vehicle)
-        return self._to_dto(saved)
+
+        return self.repository.save(dto)
 
     def get_by_plate_number(self, plate_number: str) -> VehicleDTO | None:
         """Получить авто по Рег. номеру."""
-        vehicle = self.repository.find_by_plate_number(plate_number)
-        return self._to_dto(vehicle) if vehicle else None
+        return self.repository.find_by_plate_number(plate_number)
 
     def get_all_active(self) -> list[VehicleDTO]:
         """Получить все активные авто."""
-        vehicles = self.repository.find_active()
-        return [self._to_dto(v) for v in vehicles]
+        return self.repository.find_active()  # type: ignore[no-any-return]
 
     def get_all_vehicles(self) -> list[VehicleDTO]:
         """Получить все авто (включая удаленные)."""
-        vehicles = self.repository.find_all()
-        return [self._to_dto(v) for v in vehicles]
+        return self.repository.find_all()  # type: ignore[no-any-return]
 
     def get_active_by_id(self, vehicle_id: int) -> VehicleDTO | None:
-        """Получить авто по id."""
-        vehicle = self.repository.find_active_by_id(vehicle_id)
-        return self._to_dto(vehicle) if vehicle else None
+        """Получить активное авто по id."""
+        return self.repository.find_active_by_id(vehicle_id)
 
     def get_by_id(self, vehicle_id: int) -> VehicleDTO | None:
         """Получить авто по id (даже среди удаленных)."""
-        vehicle = self.repository.find_by_id(vehicle_id)
-        return self._to_dto(vehicle) if vehicle else None
+        return self.repository.find_by_id(vehicle_id)
 
     def update_km(self, vehicle_id: int, new_km: int) -> VehicleDTO | None:
         """Обновить текущий пробег."""
-        vehicle = self.repository.find_active_by_id(vehicle_id)
-        if not vehicle:
+        dto = self.repository.find_active_by_id(vehicle_id)
+        if not dto:
             return None
 
-        if new_km < vehicle.current_km:
+        if new_km < dto.current_km:
             raise ValueError(
-                f'Новый пробег {new_km} не может быть меньше текущего {vehicle.current_km}'
+                f'Новый пробег {new_km} не может быть меньше текущего {dto.current_km}'
             )
 
-        updated = self.repository.update_km(vehicle_id, new_km)
-        return self._to_dto(updated) if updated else None
+        return self.repository.update_km(vehicle_id, new_km)
 
-    def update(self, vehicle_data: VehicleDTO) -> VehicleDTO | None:
+    def update(self, dto: VehicleDTO) -> VehicleDTO | None:
         """Обновить данные авто."""
-        vehicle = Vehicle(
-            id=vehicle_data.id,
-            brand=vehicle_data.brand,
-            model=vehicle_data.model,
-            brand_id=vehicle_data.brand_id,
-            model_id=vehicle_data.model_id,
-            plate_number=vehicle_data.plate_number,
-            year=vehicle_data.year,
-            current_km=vehicle_data.current_km,
-            is_active=vehicle_data.is_active,
-            owner_id=vehicle_data.owner_id,
-            oil_interval_km=vehicle_data.oil_interval_km,
-            transmission_interval_km=vehicle_data.transmission_interval_km,
-            brake_interval_km=vehicle_data.brake_interval_km,
-            coolant_interval_km=vehicle_data.coolant_interval_km,
-            power_steering_interval_km=vehicle_data.power_steering_interval_km,
-            differential_oil_interval_km=vehicle_data.differential_oil_interval_km,
-            oil_notify_enabled=vehicle_data.oil_notify_enabled,
-            transmission_notify_enabled=vehicle_data.transmission_notify_enabled,
-            brake_notify_enabled=vehicle_data.brake_notify_enabled,
-            coolant_notify_enabled=vehicle_data.coolant_notify_enabled,
-            power_steering_notify_enabled=vehicle_data.power_steering_notify_enabled,
-            differential_oil_notify_enabled=vehicle_data.differential_oil_notify_enabled,
-        )
-        updated = self.repository.save(vehicle)
-        return self._to_dto(updated) if updated else None
+        return self.repository.save(dto)
 
     def delete(self, vehicle_id: int) -> bool:
         """Удалить автомобиль."""
@@ -128,36 +99,8 @@ class VehicleService:
 
     def get_all_active_by_owner(self, user_id: int) -> list[VehicleDTO]:
         """Получить активные авто только для пользователя."""
-        vehicles = self.repository.find_active_by_owner(user_id)
-        return [self._to_dto(v) for v in vehicles]
+        return self.repository.find_active_by_owner(user_id)  # type: ignore[no-any-return]
 
     def get_all_vehicles_by_owner(self, user_id: int) -> list[VehicleDTO]:
         """Получить все авто пользователя (включая удалённые)."""
-        vehicles = self.repository.find_by_owner(user_id)
-        return [self._to_dto(v) for v in vehicles]
-
-    def _to_dto(self, vehicle: Vehicle) -> VehicleDTO:
-        return VehicleDTO(
-            id=vehicle.id,
-            brand=vehicle.brand,
-            model=vehicle.model,
-            brand_id=vehicle.brand_id,
-            model_id=vehicle.model_id,
-            plate_number=vehicle.plate_number,
-            year=vehicle.year,
-            current_km=vehicle.current_km,
-            is_active=vehicle.is_active,
-            owner_id=vehicle.owner_id,
-            oil_interval_km=vehicle.oil_interval_km,
-            transmission_interval_km=vehicle.transmission_interval_km,
-            brake_interval_km=vehicle.brake_interval_km,
-            coolant_interval_km=vehicle.coolant_interval_km,
-            power_steering_interval_km=vehicle.power_steering_interval_km,
-            differential_oil_interval_km=vehicle.differential_oil_interval_km,
-            oil_notify_enabled=vehicle.oil_notify_enabled,
-            transmission_notify_enabled=vehicle.transmission_notify_enabled,
-            brake_notify_enabled=vehicle.brake_notify_enabled,
-            coolant_notify_enabled=vehicle.coolant_notify_enabled,
-            power_steering_notify_enabled=vehicle.power_steering_notify_enabled,
-            differential_oil_notify_enabled=vehicle.differential_oil_notify_enabled,
-        )
+        return self.repository.find_by_owner(user_id)  # type: ignore[no-any-return]

@@ -1,10 +1,10 @@
 from datetime import date
 from pydantic import Field
-from app.common.schemas.base_liquid import LiquidBase
+from app.common.schemas.base_replacement import ReplacementBase
 
 
-class Liquid(LiquidBase):
-    """Модель жидкости."""
+class Replacement(ReplacementBase):
+    """Модель замены компонента."""
     id: int | None = Field(
         None,
         description='ID записи',

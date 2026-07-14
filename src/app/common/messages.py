@@ -25,7 +25,7 @@ SUCCESS_MESSAGES = {
     'vehicle_deleted': "Автомобиль {vehicle_id} успешно удален",
     'vehicle_restored': "Автомобиль {vehicle_id} успешно восстановлен",
     'vehicle_hard_deleted': "Автомобиль {vehicle_id} и все его замены полностью удалены",
-    'replacement_created': "Замена {liquid_name} для автомобиля {vehicle_id} успешно создана",
+    'replacement_created': "Замена {component_name} для автомобиля {vehicle_id} успешно создана",
     'replacement_deleted': "Замена {replacement_id} успешно удалена",
 }
 

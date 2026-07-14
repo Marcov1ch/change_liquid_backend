@@ -1,34 +1,20 @@
-from app.common.enums import LiquidType
-from app.common.models.vehicle import Vehicle
+from app.common.enums import ComponentType
+from app.common.component_config import COMPONENTS_CONFIG
+from app.services.dto import VehicleDTO
 
 
-class IntervalUtils:
+class ComponentIntervalUtils:
     """Утилиты для работы с интервалами замен."""
 
     @staticmethod
-    def get_interval_for_liquid(
-        vehicle: Vehicle,
-        liquid_type: LiquidType,
+    def get_interval_for_component(
+        vehicle_dto: VehicleDTO,
+        component_type: ComponentType,
     ) -> int:
-        """Получить интервал замены для жидкости из настроек автомобиля."""
-        intervals = {
-            LiquidType.ENGINE_OIL: vehicle.oil_interval_km,
-            LiquidType.TRANSMISSION_OIL: vehicle.transmission_interval_km,
-            LiquidType.BRAKE_FLUID: vehicle.brake_interval_km,
-            LiquidType.COOLANT: vehicle.coolant_interval_km,
-            LiquidType.POWER_STEERING_FLUID: vehicle.power_steering_interval_km,
-            LiquidType.DIFFERENTIAL_OIL: vehicle.differential_oil_interval_km,
-        }
-        return intervals[liquid_type]  # type: ignore[no-any-return]
+        """Получить интервал замены для компонента из настроек автомобиля."""
+        return vehicle_dto.intervals.get(component_type.value, 0)  # type: ignore[no-any-return]
 
     @staticmethod
-    def get_all_intervals(vehicle: Vehicle) -> dict[LiquidType, int]:
+    def get_all_intervals(vehicle_dto: VehicleDTO) -> dict[ComponentType, int]:
         """Получить все интервалы автомобиля."""
-        return {
-            LiquidType.ENGINE_OIL: vehicle.oil_interval_km,
-            LiquidType.TRANSMISSION_OIL: vehicle.transmission_interval_km,
-            LiquidType.BRAKE_FLUID: vehicle.brake_interval_km,
-            LiquidType.COOLANT: vehicle.coolant_interval_km,
-            LiquidType.POWER_STEERING_FLUID: vehicle.power_steering_interval_km,
-            LiquidType.DIFFERENTIAL_OIL: vehicle.differential_oil_interval_km,
-        }
+        return {cfg.type: vehicle_dto.intervals.get(cfg.type.value, 0) for cfg in COMPONENTS_CONFIG}

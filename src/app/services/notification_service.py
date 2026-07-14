@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.common.enums import StatusEnum
-from app.common.liquid_config import LIQUIDS_CONFIG
-from app.common.utils.calculator import LiquidCalculator
+from app.common.component_config import COMPONENTS_CONFIG
+from app.common.utils.calculator import StatusCalculator
 from app.repository.vehicle_repository import VehicleRepository
 from app.repository.replacement_repository import ReplacementRepository
 from app.services.email_service import (
     send_grouped_notification_email,
-    LiquidNotificationItem,
+    ComponentNotificationItem,
 )
 
 
@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 RE_NOTIFY_KM = 500
 
-LIQUID_NAMES: dict[str, str] = {cfg.type.value: cfg.name for cfg in LIQUIDS_CONFIG}
-LIQUID_NAMES_GEN: dict[str, str] = {cfg.type.value: cfg.name_genitive for cfg in LIQUIDS_CONFIG}
+COMPONENT_NAMES: dict[str, str] = {cfg.type.value: cfg.name for cfg in COMPONENTS_CONFIG}
+COMPONENT_NAMES_GEN: dict[str, str] = {cfg.type.value: cfg.name_genitive for cfg in COMPONENTS_CONFIG}
 
 
 @dataclass
 class _PendingItem:
     last: dict
-    liq_key: str
+    comp_key: str
     km_remaining: int
     status: str
     warning_notified: bool | None = None
@@ -38,6 +38,7 @@ def _send_grouped(
     vehicle: dict,
     pending: list[_PendingItem],
 ) -> None:
+    """Отправить одно письмо с группировкой всех компонентов."""
     if not pending:
         return
 
@@ -46,9 +47,9 @@ def _send_grouped(
         return
 
     items = [
-        LiquidNotificationItem(
-            liquid_name=LIQUID_NAMES[p.liq_key],
-            liquid_name_genitive=LIQUID_NAMES_GEN[p.liq_key],
+        ComponentNotificationItem(
+            component_name=COMPONENT_NAMES[p.comp_key],
+            component_name_genitive=COMPONENT_NAMES_GEN[p.comp_key],
             km_remaining=p.km_remaining,
             status=p.status,
         )
@@ -73,10 +74,10 @@ def _send_grouped(
                 overdue_notified_at_km=p.overdue_notified_at_km,
             )
 
-        liquids = ", ".join(LIQUID_NAMES[p.liq_key] for p in pending)
+        comps = ", ".join(COMPONENT_NAMES[p.comp_key] for p in pending)
         logger.info(
-            "Notification sent: user=%s vehicle=%s liquids=%s",
-            vehicle["owner_username"], vehicle["id"], liquids,
+            "Notification sent: user=%s vehicle=%s components=%s",
+            vehicle["owner_username"], vehicle["id"], comps,
         )
     except Exception as exc:
         logger.error(
@@ -86,6 +87,7 @@ def _send_grouped(
 
 
 def _reset_flags(replacement_repo: ReplacementRepository, last: dict) -> None:
+    """Сбросить флаги уведомлений, если статус вернулся в норму."""
     if last["warning_notified"] or last["critical_notified"] or last["overdue_notified_at_km"] is not None:
         replacement_repo.update_notify_tracking(
             last["id"],
@@ -99,12 +101,15 @@ def _check_vehicle(
     replacement_repo: ReplacementRepository,
     vehicle: dict,
 ) -> None:
+    """Проверить состояние всех компонентов авто и создать отложенные уведомления."""
     vehicle_id = vehicle["id"]
     pending: list[_PendingItem] = []
+    intervals: dict[str, int] = vehicle.get("intervals", {})
+    notify_flags: dict[str, bool] = vehicle.get("notify_flags", {})
 
-    for cfg in LIQUIDS_CONFIG:
-        liq_key = cfg.type.value
-        notify_enabled = vehicle.get(cfg.notify_field, True)
+    for cfg in COMPONENTS_CONFIG:
+        comp_key = cfg.type.value
+        notify_enabled = notify_flags.get(comp_key, True)
         if not notify_enabled:
             continue
 
@@ -112,13 +117,13 @@ def _check_vehicle(
         if not last:
             continue
 
-        interval = vehicle.get(cfg.interval_field)
+        interval = intervals.get(comp_key)
         if not interval:
             continue
 
         current_km = vehicle["current_km"]
 
-        result = LiquidCalculator.calculate_status(
+        result = StatusCalculator.calculate_status(
             last["km_at_replacement"],
             interval,
             current_km,
@@ -136,7 +141,7 @@ def _check_vehicle(
         elif status == StatusEnum.WARNING.value:
             if not warning_flag:
                 pending.append(_PendingItem(
-                    last=last, liq_key=liq_key,
+                    last=last, comp_key=comp_key,
                     km_remaining=km_remaining, status=status,
                     warning_notified=True,
                     critical_notified=False,
@@ -146,7 +151,7 @@ def _check_vehicle(
         elif status == StatusEnum.CRITICAL.value:
             if km_remaining > 0 and not warning_flag:
                 pending.append(_PendingItem(
-                    last=last, liq_key=liq_key,
+                    last=last, comp_key=comp_key,
                     km_remaining=km_remaining, status=status,
                     warning_notified=True,
                     critical_notified=False,
@@ -154,7 +159,7 @@ def _check_vehicle(
                 ))
             elif km_remaining == 0 and not critical_flag:
                 pending.append(_PendingItem(
-                    last=last, liq_key=liq_key,
+                    last=last, comp_key=comp_key,
                     km_remaining=km_remaining, status=status,
                     warning_notified=False,
                     critical_notified=True,
@@ -171,7 +176,7 @@ def _check_vehicle(
 
             if current_km >= threshold:
                 pending.append(_PendingItem(
-                    last=last, liq_key=liq_key,
+                    last=last, comp_key=comp_key,
                     km_remaining=km_remaining, status=status,
                     warning_notified=False,
                     critical_notified=False,
@@ -182,6 +187,7 @@ def _check_vehicle(
 
 
 def check_vehicle_notifications(db: Session, vehicle_id: int) -> None:
+    """Проверить и отправить уведомления по компонентам автомобиля."""
     vehicle_repo = VehicleRepository(db)
     replacement_repo = ReplacementRepository(db)
 

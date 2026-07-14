@@ -1,18 +1,17 @@
 from datetime import date
 from sqlalchemy.orm import Session
-from app.api.liquid.schema import LiquidReplacementRequest
+from app.api.replacement.schema import ReplacementCreateRequest
 from app.common.messages import ERROR_MESSAGES, VALIDATION_ERRORS
-from app.common.models.liquid import Liquid
-from app.common.enums import LiquidType
-from app.common.models.vehicle import Vehicle
-from app.common.utils.interval_utils import IntervalUtils
+from app.common.models.replacement import Replacement
+from app.common.enums import ComponentType
+from app.common.utils.interval_utils import ComponentIntervalUtils
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
-from app.services.dto import ReplacementDTO
+from app.services.dto import ReplacementDTO, VehicleDTO
 
 
 class ReplacementService:
-    """Сервис для работы с заменами жидкостей."""
+    """Класс для работы с заменами."""
 
     def __init__(self, db: Session):
         self.repository = ReplacementRepository(db)
@@ -21,11 +20,11 @@ class ReplacementService:
     def create(
         self,
         vehicle_id: int,
-        request: LiquidReplacementRequest,
+        request: ReplacementCreateRequest,
     ) -> ReplacementDTO:
-        """Создать запись о замене."""
-        vehicle = self.vehicle_repository.find_active_by_id(vehicle_id)
-        if not vehicle:
+        """Создать запись о замене компонента."""
+        vehicle_dto = self.vehicle_repository.find_active_by_id(vehicle_id)
+        if not vehicle_dto:
             raise ValueError(ERROR_MESSAGES['vehicle_not_found'].format(vehicle_id=vehicle_id))
 
         self._validate_common(
@@ -34,24 +33,24 @@ class ReplacementService:
         )
         self._validate_sequence(
             vehicle_id,
-            request.liquid_type,
+            request.component_type,
             request.km_at_replacement,
             request.replacement_date,
             exclude_id=None,
         )
         self._update_vehicle_km_if_needed(
-            vehicle,
+            vehicle_dto,
             request.km_at_replacement,
         )
 
-        interval_km = IntervalUtils.get_interval_for_liquid(vehicle, request.liquid_type)
+        interval_km = ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type)
 
-        replacement = Liquid(
+        replacement = Replacement(
             id=None,
             vehicle_id=vehicle_id,
-            liquid_type=request.liquid_type,
-            liquid_name=request.liquid_name,
-            liquid_price=request.liquid_price,
+            component_type=request.component_type,
+            component_name=request.component_name,
+            component_price=request.component_price,
             work_price=request.work_price,
             replacement_date=request.replacement_date,
             km_at_replacement=request.km_at_replacement,
@@ -65,7 +64,7 @@ class ReplacementService:
         self,
         replacement_id: int,
     ) -> ReplacementDTO | None:
-        """Получить запись о замене по ID."""
+        """Получить замену по id."""
         replacement = self.repository.find_by_id(replacement_id)
         return self._to_dto(replacement) if replacement else None
 
@@ -73,24 +72,24 @@ class ReplacementService:
         self,
         vehicle_id: int,
     ) -> list[ReplacementDTO]:
-        """Получить запись о замене по авто."""
+        """Получить все замены для авто."""
         return [self._to_dto(r) for r in self.repository.find_by_vehicle_id(vehicle_id)]
 
-    def get_by_vehicle_and_liquid(
+    def get_by_vehicle_and_component(
         self,
         vehicle_id: int,
-        liquid_type: LiquidType,
+        component_type: ComponentType,
     ) -> list[ReplacementDTO]:
-        """Получить записи о заменах по авто и жидкости."""
-        return [self._to_dto(r) for r in self.repository.find_by_vehicle_and_liquid(vehicle_id, liquid_type)]
+        """Получить замены для компонента автомобиля."""
+        return [self._to_dto(r) for r in self.repository.find_by_vehicle_and_component(vehicle_id, component_type)]
 
-    def get_last_for_vehicle_and_liquid(
+    def get_last_for_vehicle_and_component(
         self,
         vehicle_id: int,
-        liquid_type: LiquidType,
+        component_type: ComponentType,
     ) -> ReplacementDTO | None:
-        """Получить последнюю замену по авто и жидкости."""
-        replacement = self.repository.get_last_replacement(vehicle_id, liquid_type)
+        """Получить последнюю замену для компонента автомобиля."""
+        replacement = self.repository.get_last_replacement(vehicle_id, component_type)
         return self._to_dto(replacement) if replacement else None
 
     def update(  # type: ignore[no-untyped-def]
@@ -98,7 +97,7 @@ class ReplacementService:
         replacement_id: int,
         **kwargs,
     ) -> ReplacementDTO | None:
-        """Обновить данные о замене."""
+        """Обновить запись о замене."""
         replacement = self.repository.find_by_id(replacement_id)
         if not replacement:
             return None
@@ -110,13 +109,13 @@ class ReplacementService:
             if new_km < 0:
                 raise ValueError('Пробег не может быть отрицательным')
 
-            vehicle = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
-            if vehicle and new_km < vehicle.current_km:
-                raise ValueError(VALIDATION_ERRORS['km_less_than_current'].format(km=new_km, current_km=vehicle.current_km))
+            vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
+            if vehicle_dto and new_km < vehicle_dto.current_km:
+                raise ValueError(VALIDATION_ERRORS['km_less_than_current'].format(km=new_km, current_km=vehicle_dto.current_km))
 
             self._validate_sequence(
                 replacement.vehicle_id,
-                replacement.liquid_type,
+                replacement.component_type,
                 new_km,
                 replacement.replacement_date,
                 exclude_id=replacement_id,
@@ -127,7 +126,7 @@ class ReplacementService:
                 raise ValueError('Дата не может быть в будущем')
             self._validate_sequence(
                 replacement.vehicle_id,
-                replacement.liquid_type,
+                replacement.component_type,
                 replacement.km_at_replacement,
                 new_date,
                 exclude_id=replacement_id,
@@ -137,10 +136,10 @@ class ReplacementService:
             if value is not None and hasattr(replacement, key):
                 setattr(replacement, key, value)
 
-        vehicle = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
-        if vehicle and replacement.km_at_replacement > vehicle.current_km:
-            vehicle.current_km = replacement.km_at_replacement
-            self.vehicle_repository.save(vehicle)
+        vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
+        if vehicle_dto and replacement.km_at_replacement > vehicle_dto.current_km:
+            vehicle_dto.current_km = replacement.km_at_replacement
+            self.vehicle_repository.save(vehicle_dto)
 
         updated = self.repository.save(replacement)
         return self._to_dto(updated) if updated else None
@@ -149,13 +148,14 @@ class ReplacementService:
         """Удалить запись о замене."""
         return bool(self.repository.delete(replacement_id))
 
-    def _to_dto(self, replacement: Liquid) -> ReplacementDTO:
+    def _to_dto(self, replacement: Replacement) -> ReplacementDTO:
+        """Преобразовать модель в DTO."""
         return ReplacementDTO(
             id=replacement.id,
             vehicle_id=replacement.vehicle_id,
-            liquid_type=replacement.liquid_type,
-            liquid_name=replacement.liquid_name,
-            liquid_price=replacement.liquid_price,
+            component_type=replacement.component_type,
+            component_name=replacement.component_name,
+            component_price=replacement.component_price,
             work_price=replacement.work_price,
             replacement_date=replacement.replacement_date,
             km_at_replacement=replacement.km_at_replacement,
@@ -167,7 +167,7 @@ class ReplacementService:
         km: int,
         date_val: date,
     ) -> None:
-        """Общая валидация пробега и даты."""
+        """Выполнить базовую валидацию пробега и даты."""
         if km < 0:
             raise ValueError(VALIDATION_ERRORS['negative_km'])
         if date_val > date.today():
@@ -176,13 +176,13 @@ class ReplacementService:
     def _validate_sequence(
         self,
         vehicle_id: int,
-        liquid_type: LiquidType,
+        component_type: ComponentType,
         km: int,
         date_val: date,
         exclude_id: int | None,
     ) -> None:
-        """Проверить последовательность замен (пробег и дата должны увеличиваться)."""
-        last = self.repository.get_last_replacement(vehicle_id, liquid_type)
+        """Проверить, что новая замена не нарушает хронологию."""
+        last = self.repository.get_last_replacement(vehicle_id, component_type)
         if not last or (exclude_id and last.id == exclude_id):
             return
 
@@ -195,10 +195,10 @@ class ReplacementService:
 
     def _update_vehicle_km_if_needed(
         self,
-        vehicle: Vehicle,
+        vehicle_dto: VehicleDTO,
         new_km: int,
     ) -> None:
-        """Обновить пробег авто если новый пробег больше."""
-        if new_km > vehicle.current_km:
-            vehicle.current_km = new_km
-            self.vehicle_repository.save(vehicle)
+        """Обновить пробег автомобиля, если новый пробег больше текущего."""
+        if new_km > vehicle_dto.current_km:
+            vehicle_dto.current_km = new_km
+            self.vehicle_repository.save(vehicle_dto)

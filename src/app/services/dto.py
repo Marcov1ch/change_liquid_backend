@@ -1,7 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
-from app.common.enums import LiquidType
+from app.common.enums import ComponentType
 
 
 @dataclass
@@ -17,28 +17,18 @@ class VehicleDTO:
     current_km: int
     is_active: bool
     owner_id: int
-    oil_interval_km: int
-    transmission_interval_km: int
-    brake_interval_km: int
-    coolant_interval_km: int
-    power_steering_interval_km: int
-    differential_oil_interval_km: int
-    oil_notify_enabled: bool = True
-    transmission_notify_enabled: bool = True
-    brake_notify_enabled: bool = True
-    coolant_notify_enabled: bool = True
-    power_steering_notify_enabled: bool = True
-    differential_oil_notify_enabled: bool = True
+    intervals: dict[str, int] = field(default_factory=dict)
+    notify_flags: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass
 class ReplacementDTO:
-    """DTO для передачи данных о замене между сервисом и handler."""
+    """DTO для передачи данных о замене."""
     id: int | None
     vehicle_id: int
-    liquid_type: LiquidType
-    liquid_name: str
-    liquid_price: int | None
+    component_type: ComponentType
+    component_name: str
+    component_price: int | None
     work_price: int | None
     replacement_date: date
     km_at_replacement: int

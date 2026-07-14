@@ -6,6 +6,8 @@ Base = declarative_base()
 
 
 class BrandDB(Base):  # type: ignore
+    """Марка автомобиля."""
+
     __tablename__ = "brands"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -15,6 +17,8 @@ class BrandDB(Base):  # type: ignore
 
 
 class ModelDB(Base):  # type: ignore
+    """Модель автомобиля."""
+
     __tablename__ = "models"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -25,6 +29,8 @@ class ModelDB(Base):  # type: ignore
 
 
 class UserDB(Base):  # type: ignore
+    """Пользователь системы."""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -38,6 +44,8 @@ class UserDB(Base):  # type: ignore
 
 
 class VehicleDB(Base):  # type: ignore
+    """Автомобиль пользователя."""
+
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -71,13 +79,15 @@ class VehicleDB(Base):  # type: ignore
 
 
 class ReplacementDB(Base):  # type: ignore
+    """Замена компонента (запись о выполненной замене)."""
+
     __tablename__ = "replacements"
 
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
-    liquid_type = Column(String, nullable=False)
-    liquid_name = Column(String, nullable=False)
-    liquid_price = Column(Integer, nullable=True)
+    component_type = Column(String, nullable=False)
+    component_name = Column(String, nullable=False)
+    component_price = Column(Integer, nullable=True)
     work_price = Column(Integer, nullable=True)
     replacement_date = Column(Date, nullable=False)
     km_at_replacement = Column(Integer, nullable=False)

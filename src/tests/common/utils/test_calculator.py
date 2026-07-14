@@ -1,7 +1,7 @@
 import pytest
 
 from app.common.enums import StatusEnum
-from app.common.utils.calculator import LiquidCalculator
+from app.common.utils.calculator import StatusCalculator
 
 km_at = 1000
 interval = 5000
@@ -76,7 +76,7 @@ next_km = km_at + interval
     ],
 )
 def test_calculate_status(current_km: int, exp_remaining: int, exp_status: str) -> None:
-    result = LiquidCalculator.calculate_status(km_at, interval, current_km)
+    result = StatusCalculator.calculate_status(km_at, interval, current_km)
     assert result["km_remaining"] == exp_remaining
     assert result["status"] == exp_status
     assert result["next_replacement_km"] == next_km
