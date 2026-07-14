@@ -18,12 +18,12 @@ next_km = km_at + interval
         pytest.param(
             next_km,
             0,
-            StatusEnum.OVERDUE.value,
-            id="overdue_0",
+            StatusEnum.CRITICAL.value,
+            id="critical_0",
         ),
         pytest.param(
             7500,
-            0,
+            -1500,
             StatusEnum.OVERDUE.value,
             id="overdue_negative",
         ),
