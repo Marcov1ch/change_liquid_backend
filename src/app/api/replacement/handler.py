@@ -14,7 +14,6 @@ from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.common.enums import StatusEnum
-from app.common.component_config import COMPONENTS_CONFIG
 from app.common.utils.calculator import StatusCalculator
 from app.services.notification_service import check_vehicle_notifications
 

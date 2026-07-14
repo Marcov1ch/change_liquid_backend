@@ -1,7 +1,6 @@
 from typing import Final
 
 from app.common.enums import StatusEnum, ComponentType
-from app.common.component_config import COMPONENTS_CONFIG
 from app.services.dto import VehicleDTO, ReplacementDTO
 
 _OVERDUE: Final[int] = 250

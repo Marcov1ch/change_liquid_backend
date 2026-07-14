@@ -54,7 +54,7 @@ class VehicleHandler:
         """Рассчитать остаток км до замены."""
         if last_replacement:
             next_km = last_replacement.km_at_replacement + interval_km
-            return max(0, next_km - current_km)
+            return max(0, next_km - current_km)  # type: ignore[no-any-return]
         return None
 
     def _enrich_with_remaining(

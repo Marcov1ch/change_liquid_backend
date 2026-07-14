@@ -58,11 +58,11 @@ class VehicleService:
 
     def get_all_active(self) -> list[VehicleDTO]:
         """Получить все активные авто."""
-        return self.repository.find_active()
+        return self.repository.find_active()  # type: ignore[no-any-return]
 
     def get_all_vehicles(self) -> list[VehicleDTO]:
         """Получить все авто (включая удаленные)."""
-        return self.repository.find_all()
+        return self.repository.find_all()  # type: ignore[no-any-return]
 
     def get_active_by_id(self, vehicle_id: int) -> VehicleDTO | None:
         """Получить активное авто по id."""
@@ -99,8 +99,8 @@ class VehicleService:
 
     def get_all_active_by_owner(self, user_id: int) -> list[VehicleDTO]:
         """Получить активные авто только для пользователя."""
-        return self.repository.find_active_by_owner(user_id)
+        return self.repository.find_active_by_owner(user_id)  # type: ignore[no-any-return]
 
     def get_all_vehicles_by_owner(self, user_id: int) -> list[VehicleDTO]:
         """Получить все авто пользователя (включая удалённые)."""
-        return self.repository.find_by_owner(user_id)
+        return self.repository.find_by_owner(user_id)  # type: ignore[no-any-return]
