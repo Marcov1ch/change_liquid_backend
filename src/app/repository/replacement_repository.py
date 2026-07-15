@@ -177,7 +177,7 @@ class ReplacementRepository:
             ReplacementDB.vehicle_id == vehicle_id
         ).delete()
         self.db.commit()
-        return count
+        return count  # type: ignore[no-any-return]
 
     def get_all(self) -> List[Replacement]:
         """Получить все замены."""

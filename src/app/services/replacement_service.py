@@ -150,7 +150,7 @@ class ReplacementService:
 
     def delete_by_vehicle(self, vehicle_id: int) -> int:
         """Удалить все замены для автомобиля."""
-        return self.repository.delete_by_vehicle_id(vehicle_id)
+        return self.repository.delete_by_vehicle_id(vehicle_id)  # type: ignore[no-any-return]
 
     def _to_dto(self, replacement: Replacement) -> ReplacementDTO:
         """Преобразовать модель в DTO."""
