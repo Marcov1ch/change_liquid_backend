@@ -148,6 +148,10 @@ class ReplacementService:
         """Удалить запись о замене."""
         return bool(self.repository.delete(replacement_id))
 
+    def delete_by_vehicle(self, vehicle_id: int) -> int:
+        """Удалить все замены для автомобиля."""
+        return self.repository.delete_by_vehicle_id(vehicle_id)
+
     def _to_dto(self, replacement: Replacement) -> ReplacementDTO:
         """Преобразовать модель в DTO."""
         return ReplacementDTO(

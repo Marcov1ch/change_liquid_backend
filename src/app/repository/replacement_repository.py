@@ -171,6 +171,14 @@ class ReplacementRepository:
             return True
         return False
 
+    def delete_by_vehicle_id(self, vehicle_id: int) -> int:
+        """Удалить все замены для автомобиля. Возвращает количество удалённых."""
+        count = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id
+        ).delete()
+        self.db.commit()
+        return count
+
     def get_all(self) -> List[Replacement]:
         """Получить все замены."""
         db_replacements = self.db.query(ReplacementDB).all()
