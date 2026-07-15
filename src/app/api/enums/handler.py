@@ -50,7 +50,7 @@ class EnumsHandler:
             ComponentConfigResponse(
                 key=cfg.type.value,
                 name=cfg.name,
-                default_interval=5000,
+                default_interval=cfg.default_interval,
             )
             for cfg in COMPONENTS_CONFIG
         ]

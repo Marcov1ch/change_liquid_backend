@@ -9,7 +9,7 @@ from app.api.vehicle.schema import (
     VehicleUpdateIntervals,
     UpdateVehicleNotify,
 )
-from app.common.enums import StatusEnum
+from app.common.enums import ComponentType, StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
 from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
 from app.db.database import get_db
@@ -61,11 +61,16 @@ class VehicleHandler:
         self,
         response: VehicleResponse,
         vehicle_dto: VehicleDTO,
-        replacement_service: ReplacementService,
+        replacements: list[ReplacementDTO],
     ) -> VehicleResponse:
         """Обогатить ответ остатками км до замен."""
+        last_by_type: dict[ComponentType, ReplacementDTO] = {}
+        for r in replacements:
+            if r.component_type not in last_by_type or r.km_at_replacement > last_by_type[r.component_type].km_at_replacement:
+                last_by_type[r.component_type] = r
+
         for config in COMPONENTS_CONFIG:
-            last = replacement_service.get_last_for_vehicle_and_component(vehicle_dto.id, config.type)
+            last = last_by_type.get(config.type)
             interval = vehicle_dto.intervals.get(config.type.value)
             if interval is not None:
                 remaining = self._calc_remaining(last, interval, vehicle_dto.current_km)
@@ -79,9 +84,10 @@ class VehicleHandler:
     ) -> VehicleResponse:
         """Построить ответ для автомобиля со статусом и остатками."""
         response = self._to_response(vehicle_dto)
-        response = self._enrich_with_remaining(response, vehicle_dto, replacement_service)
 
         replacements = replacement_service.get_by_vehicle(vehicle_dto.id)
+        response = self._enrich_with_remaining(response, vehicle_dto, replacements)
+
         worst_status = StatusCalculator.get_vehicle_status(vehicle_dto, replacements)
         response.vehicle_status = worst_status
 
@@ -319,9 +325,7 @@ class VehicleHandler:
         try:
             self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-            replacements = replacement_service.get_by_vehicle(vehicle_id)
-            for replacement in replacements:
-                replacement_service.delete(replacement.id)
+            replacement_service.delete_by_vehicle(vehicle_id)
             vehicle_service.hard_delete(vehicle_id)
 
             return {
