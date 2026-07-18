@@ -42,7 +42,7 @@ class ReplacementHandler:
                 next_replacement_km=0,
                 km_remaining=0,
                 status=StatusEnum.REPLACED.value,
-                status_message="📌 Заменено (предыдущая запись)",
+                status_message="📌 Заменено",
             )
 
         interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
@@ -137,16 +137,21 @@ class ReplacementHandler:
 
             replacements_dto = replacement_service.get_by_vehicle(vehicle_id)
 
-            latest_per_type: dict[str, int] = {}
-            for r in replacements_dto:
-                prev = latest_per_type.get(r.component_type.value)
-                if prev is None or r.km_at_replacement > prev:
-                    latest_per_type[r.component_type.value] = r.km_at_replacement
+            def _type_key(replacement: ReplacementDTO) -> tuple[int, int]:
+                return (replacement.km_at_replacement, replacement.id or 0)
+
+            latest_per_type: dict[str, tuple[int, int]] = {}
+            for replacement in replacements_dto:
+                key = replacement.component_type.value
+                tup = _type_key(replacement)
+                if key not in latest_per_type or tup > latest_per_type[key]:
+                    latest_per_type[key] = tup
 
             result = []
-            for r in replacements_dto:
-                is_latest = latest_per_type.get(r.component_type.value) == r.km_at_replacement
-                result.append(self._to_response(r, vehicle, is_latest))
+            for replacement in replacements_dto:
+                latest_tup = latest_per_type.get(replacement.component_type.value)
+                is_latest = latest_tup is not None and replacement.km_at_replacement == latest_tup[0]
+                result.append(self._to_response(replacement, vehicle, is_latest))
             return result
         except HTTPException:
             raise

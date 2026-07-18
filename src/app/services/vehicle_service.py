@@ -72,11 +72,21 @@ class VehicleService:
         """Получить авто по id (даже среди удаленных)."""
         return self.repository.find_by_id(vehicle_id)
 
+    def validate_km_not_below_replacements(self, vehicle_id: int, new_km: int) -> None:
+        """Проверить, что пробег не ниже максимального пробега замен."""
+        max_km = self.repository.get_max_replacement_km(vehicle_id)
+        if new_km < max_km:
+            raise ValueError(
+                f'Пробег {new_km} км не может быть меньше максимального пробега замен ({max_km} км)'
+            )
+
     def update_km(self, vehicle_id: int, new_km: int) -> VehicleDTO | None:
         """Обновить текущий пробег."""
         dto = self.repository.find_active_by_id(vehicle_id)
         if not dto:
             return None
+
+        self.validate_km_not_below_replacements(vehicle_id, new_km)
 
         if new_km < dto.current_km:
             raise ValueError(

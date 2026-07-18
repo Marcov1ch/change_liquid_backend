@@ -107,13 +107,16 @@ def _check_vehicle(
     intervals: dict[str, int] = vehicle.get("intervals", {})
     notify_flags: dict[str, bool] = vehicle.get("notify_flags", {})
 
+    lasts = replacement_repo.get_last_replacements_with_notify(vehicle_id)
+    lasts_by_type: dict[str, dict] = {last["component_type"]: last for last in lasts}
+
     for cfg in COMPONENTS_CONFIG:
         comp_key = cfg.type.value
         notify_enabled = notify_flags.get(comp_key, True)
         if not notify_enabled:
             continue
 
-        last = replacement_repo.get_last_replacement_with_notify(vehicle_id, cfg.type)
+        last = lasts_by_type.get(comp_key)
         if not last:
             continue
 

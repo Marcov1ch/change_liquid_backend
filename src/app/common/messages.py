@@ -31,8 +31,11 @@ SUCCESS_MESSAGES = {
 
 VALIDATION_ERRORS = {
     'negative_km': 'Пробег не может быть отрицательным',
-    'future_date': 'Дата не может быть в будущем',
+    'future_date': 'Дата замены не может быть позже сегодняшнего дня',
     'km_less_than_previous': 'Пробег ({km}) не может быть меньше предыдущей замены ({previous_km})',
     'date_less_than_previous': 'Дата ({date}) не может быть раньше предыдущей замены ({previous_date})',
+    'km_greater_than_next': 'Пробег ({km}) не может быть больше следующей замены ({next_km})',
+    'date_greater_than_next': 'Дата ({date}) не может быть позже следующей замены ({next_date})',
     'km_less_than_current': 'Пробег: {km} км не может быть меньше текущего пробега авто: {current_km} км',
+    'duplicate_replacement': 'Замена с текущим пробегом уже существует',
 }

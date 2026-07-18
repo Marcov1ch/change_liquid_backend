@@ -40,6 +40,11 @@ class ReplacementService:
             request.replacement_date,
             exclude_id=None,
         )
+        self._validate_no_duplicate(
+            vehicle_id,
+            request.component_type,
+            request.km_at_replacement,
+        )
         self._update_vehicle_km_if_needed(
             vehicle_dto,
             request.km_at_replacement,
@@ -124,9 +129,6 @@ class ReplacementService:
             if new_km < 0:
                 raise ValueError('Пробег не может быть отрицательным')
 
-            if vehicle_dto and new_km < vehicle_dto.current_km:
-                raise ValueError(VALIDATION_ERRORS['km_less_than_current'].format(km=new_km, current_km=vehicle_dto.current_km))
-
             self._validate_sequence(
                 replacement.vehicle_id,
                 replacement.component_type,
@@ -200,7 +202,27 @@ class ReplacementService:
     ) -> None:
         """Проверить, что новая замена не нарушает хронологию."""
         last = self.repository.get_last_replacement(vehicle_id, component_type)
-        if not last or (exclude_id and last.id == exclude_id):
+        if not last:
+            return
+
+        if exclude_id:
+            prev, next_r = self.repository.find_neighbors(
+                vehicle_id, component_type, km, exclude_id,
+            )
+            if prev:
+                if km < prev.km_at_replacement:
+                    raise ValueError(
+                        VALIDATION_ERRORS['km_less_than_previous'].format(km=km, previous_km=prev.km_at_replacement))
+                if date_val < prev.replacement_date:
+                    raise ValueError(
+                        VALIDATION_ERRORS['date_less_than_previous'].format(date=date_val, previous_date=prev.replacement_date))
+            if next_r:
+                if km > next_r.km_at_replacement:
+                    raise ValueError(
+                        VALIDATION_ERRORS['km_greater_than_next'].format(km=km, next_km=next_r.km_at_replacement))
+                if date_val > next_r.replacement_date:
+                    raise ValueError(
+                        VALIDATION_ERRORS['date_greater_than_next'].format(date=date_val, next_date=next_r.replacement_date))
             return
 
         if km < last.km_at_replacement:
@@ -209,6 +231,19 @@ class ReplacementService:
         if date_val < last.replacement_date:
             raise ValueError(
                 VALIDATION_ERRORS['date_less_than_previous'].format(date=date_val, previous_date=last.replacement_date))
+
+    def _validate_no_duplicate(
+        self,
+        vehicle_id: int,
+        component_type: ComponentType,
+        km: int,
+    ) -> None:
+        """Проверить, что замена с таким пробегом для этого компонента ещё не существует."""
+        existing = self.repository.find_by_vehicle_component_and_km(
+            vehicle_id, component_type, km,
+        )
+        if existing:
+            raise ValueError(VALIDATION_ERRORS['duplicate_replacement'])
 
     def _update_vehicle_km_if_needed(
         self,

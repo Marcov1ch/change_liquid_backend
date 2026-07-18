@@ -65,9 +65,14 @@ class VehicleHandler:
     ) -> VehicleResponse:
         """Обогатить ответ остатками км до замен."""
         last_by_type: dict[ComponentType, ReplacementDTO] = {}
-        for r in replacements:
-            if r.component_type not in last_by_type or r.km_at_replacement > last_by_type[r.component_type].km_at_replacement:
-                last_by_type[r.component_type] = r
+        for replacement in replacements:
+            prev = last_by_type.get(replacement.component_type)
+            if prev is None:
+                last_by_type[replacement.component_type] = replacement
+            elif replacement.km_at_replacement > prev.km_at_replacement:
+                last_by_type[replacement.component_type] = replacement
+            elif replacement.km_at_replacement == prev.km_at_replacement and (replacement.id or 0) > (prev.id or 0):
+                last_by_type[replacement.component_type] = replacement
 
         for config in COMPONENTS_CONFIG:
             last = last_by_type.get(config.type)
@@ -195,6 +200,7 @@ class VehicleHandler:
             if request.year is not None:
                 existing_dto.year = request.year
             if request.current_km is not None:
+                vehicle_service.validate_km_not_below_replacements(vehicle_id, request.current_km)
                 existing_dto.current_km = request.current_km
             if request.intervals is not None:
                 existing_dto.intervals.update(request.intervals)
@@ -207,6 +213,11 @@ class VehicleHandler:
                 check_vehicle_notifications(db, vehicle_id)
 
             return self._to_response(updated_dto)
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(err),
+            )
         except HTTPException:
             raise
         except Exception as err:
