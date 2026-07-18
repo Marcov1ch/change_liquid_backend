@@ -68,13 +68,13 @@ class ReplacementHandler:
             status_message=status_data["status_message"]
         )
 
-    def _check_vehicle_access(
+    def _get_vehicle_and_check_access(
         self,
         vehicle_id: int,
         current_user: UserDB,
         vehicle_service: VehicleService,
-    ) -> None:
-        """Проверить, что автомобиль принадлежит пользователю."""
+    ) -> VehicleDTO:
+        """Получить авто и проверить, что оно принадлежит пользователю."""
         vehicle = vehicle_service.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(
@@ -86,6 +86,7 @@ class ReplacementHandler:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied",
             )
+        return vehicle
 
     async def create_replacements(
         self,
@@ -99,12 +100,11 @@ class ReplacementHandler:
         vehicle_service = VehicleService(db)
 
         try:
-            self._check_vehicle_access(vehicle_id, current_user, vehicle_service)
+            vehicle = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
             results = []
             for replacement_request in request.replacements:
-                replacement_dto = replacement_service.create(vehicle_id, replacement_request)
-                vehicle = vehicle_service.get_active_by_id(vehicle_id)
+                replacement_dto = replacement_service.create(vehicle_id, replacement_request, vehicle)
                 results.append(self._to_response(replacement_dto, vehicle))
 
             check_vehicle_notifications(db, vehicle_id)
@@ -133,9 +133,8 @@ class ReplacementHandler:
         replacement_service = ReplacementService(db)
 
         try:
-            self._check_vehicle_access(vehicle_id, current_user, vehicle_service)
+            vehicle = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-            vehicle = vehicle_service.get_active_by_id(vehicle_id)
             replacements_dto = replacement_service.get_by_vehicle(vehicle_id)
 
             latest_per_type: dict[str, int] = {}
@@ -175,9 +174,8 @@ class ReplacementHandler:
                     detail='Replacement not found',
                 )
 
-            self._check_vehicle_access(replacement_dto.vehicle_id, current_user, vehicle_service)
+            vehicle = self._get_vehicle_and_check_access(replacement_dto.vehicle_id, current_user, vehicle_service)
 
-            vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
             return self._to_response(replacement_dto, vehicle)
         except HTTPException:
             raise
@@ -206,12 +204,10 @@ class ReplacementHandler:
                     detail='Replacement not found',
                 )
 
-            self._check_vehicle_access(replacement_dto.vehicle_id, current_user, vehicle_service)
+            vehicle = self._get_vehicle_and_check_access(replacement_dto.vehicle_id, current_user, vehicle_service)
 
             update_data = request.model_dump(exclude_none=True)
             replacement_dto = replacement_service.update(replacement_id, **update_data)
-
-            vehicle = vehicle_service.get_active_by_id(replacement_dto.vehicle_id)
 
             check_vehicle_notifications(db, replacement_dto.vehicle_id)
 
@@ -247,7 +243,7 @@ class ReplacementHandler:
                     detail='Replacement not found',
                 )
 
-            self._check_vehicle_access(replacement_dto.vehicle_id, current_user, vehicle_service)
+            self._get_vehicle_and_check_access(replacement_dto.vehicle_id, current_user, vehicle_service)
 
             replacement_service.delete(replacement_id)
 

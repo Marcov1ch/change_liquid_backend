@@ -89,6 +89,34 @@ class VehicleService:
         """Обновить данные авто."""
         return self.repository.save(dto)
 
+    def update_brand_model(
+        self,
+        dto: VehicleDTO,
+        brand: str | None,
+        model: str | None,
+    ) -> VehicleDTO:
+        """Обновить марку/модель на DTO с резолвом brand_id/model_id."""
+        current_brand = brand if brand is not None else dto.brand
+
+        if brand is not None:
+            brand_obj = self.enum_repo.get_brand_by_name(brand)
+            if not brand_obj:
+                raise ValueError(f'Brand "{brand}" not found')
+            dto.brand = brand
+            dto.brand_id = brand_obj.id
+
+        if model is not None:
+            models = self.enum_repo.get_models_by_brand(current_brand)
+            model_obj = next((m for m in models if m.name == model), None)
+            if not model_obj:
+                raise ValueError(
+                    f'Model "{model}" not found for brand "{current_brand}"'
+                )
+            dto.model = model
+            dto.model_id = model_obj.id
+
+        return dto
+
     def delete(self, vehicle_id: int) -> bool:
         """Удалить автомобиль."""
         return bool(self.repository.delete(vehicle_id))
