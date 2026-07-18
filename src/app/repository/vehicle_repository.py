@@ -37,10 +37,8 @@ class VehicleRepository:
     def _apply_intervals(self, db_vehicle: VehicleDB, dto: VehicleDTO) -> None:
         """Записать значения интервалов и флагов из DTO в ORM-модель."""
         for cfg in COMPONENTS_CONFIG:
-            if cfg.type.value in dto.intervals:
-                setattr(db_vehicle, cfg.interval_field, dto.intervals[cfg.type.value])
-            if cfg.type.value in dto.notify_flags:
-                setattr(db_vehicle, cfg.notify_field, dto.notify_flags[cfg.type.value])
+            setattr(db_vehicle, cfg.interval_field, dto.intervals.get(cfg.type.value, cfg.default_interval))
+            setattr(db_vehicle, cfg.notify_field, dto.notify_flags.get(cfg.type.value, True))
 
     def save(self, dto: VehicleDTO) -> VehicleDTO:
         """Создать или обновить запись об автомобиле."""

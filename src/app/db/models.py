@@ -57,12 +57,13 @@ class VehicleDB(Base):  # type: ignore
     is_active = Column(Boolean, default=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    oil_interval_km = Column(Integer, default=7000)
-    transmission_interval_km = Column(Integer, default=60000)
-    brake_interval_km = Column(Integer, default=40000)
-    coolant_interval_km = Column(Integer, default=60000)
-    power_steering_interval_km = Column(Integer, default=60000)
-    differential_oil_interval_km = Column(Integer, default=60000)
+    # defaults управляются app.common.component_config COMPONENTS_CONFIG
+    oil_interval_km = Column(Integer)
+    transmission_interval_km = Column(Integer)
+    brake_interval_km = Column(Integer)
+    coolant_interval_km = Column(Integer)
+    power_steering_interval_km = Column(Integer)
+    differential_oil_interval_km = Column(Integer)
 
     oil_notify_enabled = Column(Boolean, default=True)
     transmission_notify_enabled = Column(Boolean, default=True)
