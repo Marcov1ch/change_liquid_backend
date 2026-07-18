@@ -114,6 +114,30 @@ class ReplacementRepository:
             result.append(Replacement(**result_dict))
         return result
 
+    def find_by_vehicle_component_and_km(
+        self,
+        vehicle_id: int,
+        component_type: ComponentType,
+        km: int,
+    ) -> Optional[Replacement]:
+        """Найти замену по автомобилю, типу компонента и пробегу."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.component_type == component_type.value,
+            ReplacementDB.km_at_replacement == km,
+        ).first()
+
+        if not db_replacement:
+            return None
+
+        result_dict = db_replacement.__dict__.copy()
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('critical_notified', None)
+        result_dict.pop('overdue_notified_at_km', None)
+        if result_dict.get('component_type'):
+            result_dict['component_type'] = ComponentType(result_dict['component_type'])
+        return Replacement(**result_dict)
+
     def get_last_replacement(
             self,
             vehicle_id: int,
@@ -135,6 +159,72 @@ class ReplacementRepository:
         if result_dict.get('component_type'):
             result_dict['component_type'] = ComponentType(result_dict['component_type'])
         return Replacement(**result_dict)
+
+    def find_previous_replacement(
+        self,
+        vehicle_id: int,
+        component_type: ComponentType,
+        exclude_id: int,
+    ) -> Optional[Replacement]:
+        """Найти предыдущую замену для компонента, исключая указанный ID."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.component_type == component_type.value,
+            ReplacementDB.id != exclude_id,
+        ).order_by(ReplacementDB.km_at_replacement.desc()).first()
+
+        if not db_replacement:
+            return None
+
+        result_dict = db_replacement.__dict__.copy()
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('critical_notified', None)
+        result_dict.pop('overdue_notified_at_km', None)
+        if result_dict.get('component_type'):
+            result_dict['component_type'] = ComponentType(result_dict['component_type'])
+        return Replacement(**result_dict)
+
+    def find_neighbors(
+        self,
+        vehicle_id: int,
+        component_type: ComponentType,
+        km: int,
+        exclude_id: int,
+    ) -> tuple[Optional[Replacement], Optional[Replacement]]:
+        """Найти предыдущую (max_km < km) и следующую (min_km > km) замену, исключая указанный ID."""
+        def _to_replacement(db_row: ReplacementDB) -> Replacement:
+            result_dict = db_row.__dict__.copy()
+            result_dict.pop('_sa_instance_state', None)
+            result_dict.pop('warning_notified', None)
+            result_dict.pop('critical_notified', None)
+            result_dict.pop('overdue_notified_at_km', None)
+            if result_dict.get('component_type'):
+                result_dict['component_type'] = ComponentType(result_dict['component_type'])
+            return Replacement(**result_dict)
+
+        base_filter = (
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.component_type == component_type.value,
+            ReplacementDB.id != exclude_id,
+        )
+
+        prev_row = (
+            self.db.query(ReplacementDB)
+            .filter(*base_filter, ReplacementDB.km_at_replacement < km)
+            .order_by(ReplacementDB.km_at_replacement.desc())
+            .first()
+        )
+        next_row = (
+            self.db.query(ReplacementDB)
+            .filter(*base_filter, ReplacementDB.km_at_replacement > km)
+            .order_by(ReplacementDB.km_at_replacement.asc())
+            .first()
+        )
+
+        return (
+            _to_replacement(prev_row) if prev_row else None,
+            _to_replacement(next_row) if next_row else None,
+        )
 
     def get_last_replacement_with_notify(
         self,
@@ -158,6 +248,55 @@ class ReplacementRepository:
             "critical_notified": db_replacement.critical_notified,
             "overdue_notified_at_km": db_replacement.overdue_notified_at_km,
         }
+
+    def get_last_replacements_with_notify(
+        self,
+        vehicle_id: int,
+    ) -> list[dict]:
+        """Получить последние замены для всех типов компонентов за один запрос."""
+        from sqlalchemy import func, and_
+
+        subq = (
+            self.db.query(
+                ReplacementDB.component_type,
+                func.max(ReplacementDB.km_at_replacement).label('max_km'),
+            )
+            .filter(ReplacementDB.vehicle_id == vehicle_id)
+            .group_by(ReplacementDB.component_type)
+            .subquery()
+        )
+
+        rows = (
+            self.db.query(ReplacementDB)
+            .join(
+                subq,
+                and_(
+                    ReplacementDB.component_type == subq.c.component_type,
+                    ReplacementDB.km_at_replacement == subq.c.max_km,
+                ),
+            )
+            .filter(ReplacementDB.vehicle_id == vehicle_id)
+            .all()
+        )
+
+        best_by_type: dict[str, ReplacementDB] = {}
+        for r in rows:
+            key = r.component_type
+            if key not in best_by_type or r.id > best_by_type[key].id:
+                best_by_type[key] = r
+
+        return [
+            {
+                "id": r.id,
+                "component_type": r.component_type,
+                "km_at_replacement": r.km_at_replacement,
+                "interval_km": r.interval_km,
+                "warning_notified": r.warning_notified,
+                "critical_notified": r.critical_notified,
+                "overdue_notified_at_km": r.overdue_notified_at_km,
+            }
+            for r in best_by_type.values()
+        ]
 
     def update_notify_tracking(
         self,

@@ -1,6 +1,7 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.db.models import VehicleDB
+from app.db.models import ReplacementDB, VehicleDB
 from app.services.dto import VehicleDTO
 from app.common.component_config import COMPONENTS_CONFIG
 
@@ -99,6 +100,13 @@ class VehicleRepository:
             VehicleDB.id == vehicle_id, VehicleDB.is_active
         ).first()
         return self._to_dto(db_vehicle) if db_vehicle else None
+
+    def get_max_replacement_km(self, vehicle_id: int) -> int:
+        """Максимальный пробег среди всех замен для авто."""
+        result = self.db.query(func.max(ReplacementDB.km_at_replacement)).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+        ).scalar()
+        return result or 0
 
     def update_km(self, vehicle_id: int, new_km: int) -> VehicleDTO | None:
         """Обновить пробег автомобиля."""

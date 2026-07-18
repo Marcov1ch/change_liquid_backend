@@ -54,17 +54,22 @@ class StatusCalculator:
             return StatusEnum.UNKNOWN.value  # type: ignore[no-any-return]
 
         last_by_type: dict[ComponentType, ReplacementDTO] = {}
-        for r in replacements:
-            if r.component_type not in last_by_type or r.km_at_replacement > last_by_type[r.component_type].km_at_replacement:
-                last_by_type[r.component_type] = r
+        for replacement in replacements:
+            prev = last_by_type.get(replacement.component_type)
+            if prev is None:
+                last_by_type[replacement.component_type] = replacement
+            elif replacement.km_at_replacement > prev.km_at_replacement:
+                last_by_type[replacement.component_type] = replacement
+            elif replacement.km_at_replacement == prev.km_at_replacement and (replacement.id or 0) > (prev.id or 0):
+                last_by_type[replacement.component_type] = replacement
 
         has_warning = False
-        for r in last_by_type.values():
-            interval = vehicle_dto.intervals.get(r.component_type.value)
+        for replacement in last_by_type.values():
+            interval = vehicle_dto.intervals.get(replacement.component_type.value)
             if interval is None:
                 continue
             status = StatusCalculator.calculate_status(
-                r.km_at_replacement,
+                replacement.km_at_replacement,
                 interval,
                 vehicle_dto.current_km)['status']
             if status == StatusEnum.OVERDUE.value:
