@@ -59,6 +59,24 @@ class ReplacementRepository:
             result_dict['component_type'] = ComponentType(result_dict['component_type'])
         return Replacement(**result_dict)
 
+    def find_by_vehicle_ids(self, vehicle_ids: list[int]) -> List[Replacement]:
+        """Найти все замены для списка автомобилей."""
+        db_replacements = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id.in_(vehicle_ids)
+        ).all()
+
+        result = []
+        for r in db_replacements:
+            result_dict = r.__dict__.copy()
+            result_dict.pop('_sa_instance_state', None)
+            result_dict.pop('warning_notified', None)
+            result_dict.pop('critical_notified', None)
+            result_dict.pop('overdue_notified_at_km', None)
+            if result_dict.get('component_type'):
+                result_dict['component_type'] = ComponentType(result_dict['component_type'])
+            result.append(Replacement(**result_dict))
+        return result
+
     def find_by_vehicle_id(self, vehicle_id: int) -> List[Replacement]:
         """Найти все замены для автомобиля."""
         db_replacements = self.db.query(ReplacementDB).filter(

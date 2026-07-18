@@ -21,9 +21,11 @@ class ReplacementService:
         self,
         vehicle_id: int,
         request: ReplacementCreateRequest,
+        vehicle_dto: VehicleDTO | None = None,
     ) -> ReplacementDTO:
         """Создать запись о замене компонента."""
-        vehicle_dto = self.vehicle_repository.find_active_by_id(vehicle_id)
+        if vehicle_dto is None:
+            vehicle_dto = self.vehicle_repository.find_active_by_id(vehicle_id)
         if not vehicle_dto:
             raise ValueError(ERROR_MESSAGES['vehicle_not_found'].format(vehicle_id=vehicle_id))
 
@@ -75,6 +77,17 @@ class ReplacementService:
         """Получить все замены для авто."""
         return [self._to_dto(r) for r in self.repository.find_by_vehicle_id(vehicle_id)]
 
+    def get_by_vehicles(
+        self,
+        vehicle_ids: list[int],
+    ) -> dict[int, list[ReplacementDTO]]:
+        """Получить все замены для списка авто, сгруппированные по vehicle_id."""
+        replacements = self.repository.find_by_vehicle_ids(vehicle_ids)
+        grouped: dict[int, list[ReplacementDTO]] = {}
+        for r in replacements:
+            grouped.setdefault(r.vehicle_id, []).append(self._to_dto(r))
+        return grouped
+
     def get_by_vehicle_and_component(
         self,
         vehicle_id: int,
@@ -105,11 +118,12 @@ class ReplacementService:
         new_km = kwargs.get('km_at_replacement')
         new_date = kwargs.get('replacement_date')
 
+        vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
+
         if new_km is not None:
             if new_km < 0:
                 raise ValueError('Пробег не может быть отрицательным')
 
-            vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
             if vehicle_dto and new_km < vehicle_dto.current_km:
                 raise ValueError(VALIDATION_ERRORS['km_less_than_current'].format(km=new_km, current_km=vehicle_dto.current_km))
 
@@ -136,7 +150,6 @@ class ReplacementService:
             if value is not None and hasattr(replacement, key):
                 setattr(replacement, key, value)
 
-        vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
         if vehicle_dto and replacement.km_at_replacement > vehicle_dto.current_km:
             vehicle_dto.current_km = replacement.km_at_replacement
             self.vehicle_repository.save(vehicle_dto)

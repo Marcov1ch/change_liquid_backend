@@ -80,12 +80,10 @@ class VehicleHandler:
     def _build_vehicle_response(
         self,
         vehicle_dto: VehicleDTO,
-        replacement_service: ReplacementService,
+        replacements: list[ReplacementDTO],
     ) -> VehicleResponse:
         """Построить ответ для автомобиля со статусом и остатками."""
         response = self._to_response(vehicle_dto)
-
-        replacements = replacement_service.get_by_vehicle(vehicle_dto.id)
         response = self._enrich_with_remaining(response, vehicle_dto, replacements)
 
         worst_status = StatusCalculator.get_vehicle_status(vehicle_dto, replacements)
@@ -128,7 +126,13 @@ class VehicleHandler:
         else:
             vehicles_dto = vehicle_service.get_all_active_by_owner(current_user.id)
 
-        return [self._build_vehicle_response(v, replacement_service) for v in vehicles_dto]
+        vehicle_ids = [v.id for v in vehicles_dto]
+        replacements_by_vehicle = replacement_service.get_by_vehicles(vehicle_ids) if vehicle_ids else {}
+
+        return [
+            self._build_vehicle_response(v, replacements_by_vehicle.get(v.id, []))
+            for v in vehicles_dto
+        ]
 
     async def get_vehicle(
         self,
@@ -142,7 +146,8 @@ class VehicleHandler:
 
         vehicle_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-        return self._build_vehicle_response(vehicle_dto, replacement_service)
+        replacements = replacement_service.get_by_vehicle(vehicle_dto.id)
+        return self._build_vehicle_response(vehicle_dto, replacements)
 
     async def create_vehicle(
         self,
@@ -183,10 +188,8 @@ class VehicleHandler:
         try:
             existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
 
-            if request.brand is not None:
-                existing_dto.brand = request.brand
-            if request.model is not None:
-                existing_dto.model = request.model
+            if request.brand is not None or request.model is not None:
+                vehicle_service.update_brand_model(existing_dto, request.brand, request.model)
             if request.plate_number is not None:
                 existing_dto.plate_number = request.plate_number
             if request.year is not None:
