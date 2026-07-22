@@ -12,6 +12,7 @@ from app.api.vehicle.schema import (
 from app.common.enums import ComponentType, StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
 from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
+from app.common.middleware import verify_vehicle_access
 from app.db.database import get_db
 from app.db.models import UserDB
 from app.auth.jwt import get_current_user
@@ -96,26 +97,6 @@ class VehicleHandler:
 
         return response
 
-    def _get_vehicle_and_check_access(
-        self,
-        vehicle_id: int,
-        current_user: UserDB,
-        vehicle_service: VehicleService,
-    ) -> VehicleDTO:
-        """Получить авто и проверить доступ."""
-        existing_dto = vehicle_service.get_by_id(vehicle_id)
-        if not existing_dto:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=ERROR_MESSAGES['vehicle_not_found'].format(vehicle_id=vehicle_id),
-            )
-        if existing_dto.owner_id != current_user.id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied",
-            )
-        return existing_dto
-
     async def get_vehicles(
         self,
         include_archived: bool = False,
@@ -141,18 +122,14 @@ class VehicleHandler:
 
     async def get_vehicle(
         self,
-        vehicle_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> VehicleResponse:
         """Получить автомобиль по ID."""
-        vehicle_service = VehicleService(db)
         replacement_service = ReplacementService(db)
 
-        vehicle_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
-        replacements = replacement_service.get_by_vehicle(vehicle_dto.id)
-        return self._build_vehicle_response(vehicle_dto, replacements)
+        replacements = replacement_service.get_by_vehicle(vehicle.id)
+        return self._build_vehicle_response(vehicle, replacements)
 
     async def create_vehicle(
         self,
@@ -183,15 +160,14 @@ class VehicleHandler:
 
     async def update_vehicle(
         self,
-        vehicle_id: int,
         request: UpdateVehicleData,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> VehicleResponse:
         """Обновить данные авто."""
         vehicle_service = VehicleService(db)
         try:
-            existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
+            existing_dto = vehicle
 
             if request.brand is not None or request.model is not None:
                 vehicle_service.update_brand_model(existing_dto, request.brand, request.model)
@@ -200,7 +176,7 @@ class VehicleHandler:
             if request.year is not None:
                 existing_dto.year = request.year
             if request.current_km is not None:
-                vehicle_service.validate_km_not_below_replacements(vehicle_id, request.current_km)
+                vehicle_service.validate_km_not_below_replacements(vehicle.id, request.current_km)
                 existing_dto.current_km = request.current_km
             if request.intervals is not None:
                 existing_dto.intervals.update(request.intervals)
@@ -210,7 +186,7 @@ class VehicleHandler:
             updated_dto = vehicle_service.update(existing_dto)
 
             if request.current_km is not None:
-                check_vehicle_notifications(db, vehicle_id)
+                check_vehicle_notifications(db, vehicle.id)
 
             return self._to_response(updated_dto)
         except ValueError as err:
@@ -228,22 +204,19 @@ class VehicleHandler:
 
     async def update_vehicle_km(
         self,
-        vehicle_id: int,
         request: UpdateKMRequest,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> VehicleResponse:
         """Обновить пробег авто."""
         vehicle_service = VehicleService(db)
         try:
-            self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
             vehicle_dto = vehicle_service.update_km(
-                vehicle_id=vehicle_id,
+                vehicle_id=vehicle.id,
                 new_km=request.new_km,
             )
 
-            check_vehicle_notifications(db, vehicle_id)
+            check_vehicle_notifications(db, vehicle.id)
 
             return self._to_response(vehicle_dto)
         except ValueError as err:
@@ -258,20 +231,17 @@ class VehicleHandler:
 
     async def update_vehicle_intervals(
         self,
-        vehicle_id: int,
         request: VehicleUpdateIntervals,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> VehicleResponse:
         """Обновить интервалы замен."""
         vehicle_service = VehicleService(db)
         try:
-            existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
             if request.intervals is not None:
-                existing_dto.intervals.update(request.intervals)
+                vehicle.intervals.update(request.intervals)
 
-            updated_dto = vehicle_service.update(existing_dto)
+            updated_dto = vehicle_service.update(vehicle)
             return self._to_response(updated_dto)
         except Exception as err:
             raise HTTPException(
@@ -281,20 +251,17 @@ class VehicleHandler:
 
     async def update_notify(
         self,
-        vehicle_id: int,
         request: UpdateVehicleNotify,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> VehicleResponse:
         """Обновить настройки уведомлений для авто."""
         vehicle_service = VehicleService(db)
         try:
-            existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
             if request.notify_flags is not None:
-                existing_dto.notify_flags.update(request.notify_flags)
+                vehicle.notify_flags.update(request.notify_flags)
 
-            updated_dto = vehicle_service.update(existing_dto)
+            updated_dto = vehicle_service.update(vehicle)
             return self._to_response(updated_dto)
         except Exception as err:
             raise HTTPException(
@@ -304,19 +271,16 @@ class VehicleHandler:
 
     async def delete_vehicle(
         self,
-        vehicle_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> dict[str, str]:
         """Мягкое удаление авто (в архив)."""
         vehicle_service = VehicleService(db)
         try:
-            self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
-            vehicle_service.delete(vehicle_id)
+            vehicle_service.delete(vehicle.id)
             return {
                 'status': 'ok',
-                'message': SUCCESS_MESSAGES['vehicle_deleted'].format(vehicle_id=vehicle_id),
+                'message': SUCCESS_MESSAGES['vehicle_deleted'].format(vehicle_id=vehicle.id),
             }
         except HTTPException:
             raise
@@ -328,23 +292,20 @@ class VehicleHandler:
 
     async def hard_delete_vehicle(
         self,
-        vehicle_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> dict[str, str]:
         """Полное удаление авто из БД."""
         vehicle_service = VehicleService(db)
         replacement_service = ReplacementService(db)
 
         try:
-            self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
-            replacement_service.delete_by_vehicle(vehicle_id)
-            vehicle_service.hard_delete(vehicle_id)
+            replacement_service.delete_by_vehicle(vehicle.id)
+            vehicle_service.hard_delete(vehicle.id)
 
             return {
                 'status': 'ok',
-                'message': f'Vehicle {vehicle_id} and all its replacements have been permanently deleted',
+                'message': f'Vehicle {vehicle.id} and all its replacements have been permanently deleted',
             }
         except HTTPException:
             raise
@@ -356,22 +317,19 @@ class VehicleHandler:
 
     async def restore_vehicle(
         self,
-        vehicle_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> VehicleResponse:
         """Восстановить авто из архива."""
         vehicle_service = VehicleService(db)
         try:
-            existing_dto = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
-            if existing_dto.is_active:
+            if vehicle.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail='Vehicle is already active',
                 )
-            existing_dto.is_active = True
-            updated_dto = vehicle_service.update(existing_dto)
+            vehicle.is_active = True
+            updated_dto = vehicle_service.update(vehicle)
             return self._to_response(updated_dto)
         except HTTPException:
             raise

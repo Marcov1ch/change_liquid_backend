@@ -8,11 +8,10 @@ from app.api.replacement.schema import (
     ReplacementsBulkRequest,
 )
 from app.db.database import get_db
-from app.db.models import UserDB
-from app.auth.jwt import get_current_user
 from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
+from app.common.middleware import verify_vehicle_access, verify_replacement_access
 from app.common.enums import StatusEnum
 from app.common.utils.calculator import StatusCalculator
 from app.services.notification_service import check_vehicle_notifications
@@ -68,46 +67,22 @@ class ReplacementHandler:
             status_message=status_data["status_message"]
         )
 
-    def _get_vehicle_and_check_access(
-        self,
-        vehicle_id: int,
-        current_user: UserDB,
-        vehicle_service: VehicleService,
-    ) -> VehicleDTO:
-        """Получить авто и проверить, что оно принадлежит пользователю."""
-        vehicle = vehicle_service.get_by_id(vehicle_id)
-        if not vehicle:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail='Vehicle not found',
-            )
-        if vehicle.owner_id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied",
-            )
-        return vehicle
-
     async def create_replacements(
         self,
-        vehicle_id: int,
         request: ReplacementsBulkRequest,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> List[ReplacementResponse]:
         """Создать несколько замен сразу (например, при ТО)."""
         replacement_service = ReplacementService(db)
-        vehicle_service = VehicleService(db)
 
         try:
-            vehicle = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
             results = []
             for replacement_request in request.replacements:
-                replacement_dto = replacement_service.create(vehicle_id, replacement_request, vehicle)
+                replacement_dto = replacement_service.create(vehicle.id, replacement_request, vehicle)
                 results.append(self._to_response(replacement_dto, vehicle))
 
-            check_vehicle_notifications(db, vehicle_id)
+            check_vehicle_notifications(db, vehicle.id)
             return results
         except ValueError as err:
             raise HTTPException(
@@ -124,18 +99,14 @@ class ReplacementHandler:
 
     async def get_vehicle_replacements(
         self,
-        vehicle_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
     ) -> List[ReplacementResponse]:
         """Получить все замены для автомобиля с расчётом статусов."""
-        vehicle_service = VehicleService(db)
         replacement_service = ReplacementService(db)
 
         try:
-            vehicle = self._get_vehicle_and_check_access(vehicle_id, current_user, vehicle_service)
-
-            replacements_dto = replacement_service.get_by_vehicle(vehicle_id)
+            replacements_dto = replacement_service.get_by_vehicle(vehicle.id)
 
             def _type_key(replacement: ReplacementDTO) -> tuple[int, int]:
                 return (replacement.km_at_replacement, replacement.id or 0)
@@ -163,25 +134,15 @@ class ReplacementHandler:
 
     async def get_replacement(
         self,
-        replacement_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        replacement: ReplacementDTO = Depends(verify_replacement_access),
     ) -> ReplacementResponse:
         """Получить конкретную замену по ID."""
-        replacement_service = ReplacementService(db)
         vehicle_service = VehicleService(db)
 
         try:
-            replacement_dto = replacement_service.get_by_id(replacement_id)
-            if not replacement_dto:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail='Replacement not found',
-                )
-
-            vehicle = self._get_vehicle_and_check_access(replacement_dto.vehicle_id, current_user, vehicle_service)
-
-            return self._to_response(replacement_dto, vehicle)
+            vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
+            return self._to_response(replacement, vehicle)
         except HTTPException:
             raise
         except Exception as err:
@@ -192,27 +153,19 @@ class ReplacementHandler:
 
     async def update_replacement(
         self,
-        replacement_id: int,
         request: UpdateReplacementRequest,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        replacement: ReplacementDTO = Depends(verify_replacement_access),
     ) -> ReplacementResponse:
         """Обновить запись о замене."""
         replacement_service = ReplacementService(db)
         vehicle_service = VehicleService(db)
 
         try:
-            replacement_dto = replacement_service.get_by_id(replacement_id)
-            if not replacement_dto:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail='Replacement not found',
-                )
-
-            vehicle = self._get_vehicle_and_check_access(replacement_dto.vehicle_id, current_user, vehicle_service)
+            vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
 
             update_data = request.model_dump(exclude_none=True)
-            replacement_dto = replacement_service.update(replacement_id, **update_data)
+            replacement_dto = replacement_service.update(replacement.id, **update_data)
 
             check_vehicle_notifications(db, replacement_dto.vehicle_id)
 
@@ -232,27 +185,16 @@ class ReplacementHandler:
 
     async def delete_replacement(
         self,
-        replacement_id: int,
         db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user),
+        replacement: ReplacementDTO = Depends(verify_replacement_access),
     ) -> dict[str, str]:
         """Удалить запись о замене."""
         replacement_service = ReplacementService(db)
-        vehicle_service = VehicleService(db)
 
         try:
-            replacement_dto = replacement_service.get_by_id(replacement_id)
-            if not replacement_dto:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail='Replacement not found',
-                )
+            replacement_service.delete(replacement.id)
 
-            self._get_vehicle_and_check_access(replacement_dto.vehicle_id, current_user, vehicle_service)
-
-            replacement_service.delete(replacement_id)
-
-            return {'status': 'ok', 'message': f'Replacement {replacement_id} has been deleted'}
+            return {'status': 'ok', 'message': f'Replacement {replacement.id} has been deleted'}
         except HTTPException:
             raise
         except Exception as err:
