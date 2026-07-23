@@ -86,6 +86,7 @@ class ReplacementRepository:
         result = []
         for r in db_replacements:
             result_dict = r.__dict__.copy()
+            result_dict.pop('warning_notified', None)
             result_dict.pop('critical_notified', None)
             result_dict.pop('overdue_notified_at_km', None)
             if result_dict.get('component_type'):
@@ -107,6 +108,7 @@ class ReplacementRepository:
         result = []
         for r in db_replacements:
             result_dict = r.__dict__.copy()
+            result_dict.pop('warning_notified', None)
             result_dict.pop('critical_notified', None)
             result_dict.pop('overdue_notified_at_km', None)
             if result_dict.get('component_type'):

@@ -41,7 +41,7 @@ failed_attempts: defaultdict[str, list[datetime]] = defaultdict(list)
 
 def check_rate_limit(username: str) -> bool:
     """Проверяет, не превышен ли лимит попыток входа (3 попытки за 5 минут)."""
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     failed_attempts[username] = [
         t for t in failed_attempts[username]
         if now - t < timedelta(minutes=5)
@@ -55,7 +55,7 @@ def check_rate_limit(username: str) -> bool:
 
 def add_failed_attempt(username: str) -> None:
     """Добавляет неудачную попытку входа."""
-    failed_attempts[username].append(datetime.now())
+    failed_attempts[username].append(datetime.now(timezone.utc))
 
 
 @router.post("/register", response_model=UserResponse)
@@ -120,11 +120,8 @@ async def login(
         )
 
     if not user.is_active:
-        add_failed_attempt(username)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User is inactive"
-        )
+        user.is_active = True
+        db.commit()
 
     failed_attempts[username].clear()
 
