@@ -11,6 +11,18 @@ class ReplacementRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    @staticmethod
+    def _to_replacement(db_row: ReplacementDB) -> Replacement:
+        """Конвертировать ORM-модель в доменную модель."""
+        result_dict = db_row.__dict__.copy()
+        result_dict.pop('_sa_instance_state', None)
+        result_dict.pop('warning_notified', None)
+        result_dict.pop('critical_notified', None)
+        result_dict.pop('overdue_notified_at_km', None)
+        if result_dict.get('component_type'):
+            result_dict['component_type'] = ComponentType(result_dict['component_type'])
+        return Replacement(**result_dict)
+
     def save(self, replacement: Replacement) -> Replacement:
         """Создать или обновить запись о замене."""
         if replacement.id:
@@ -35,13 +47,7 @@ class ReplacementRepository:
         self.db.commit()
         self.db.refresh(db_replacement)
 
-        result_dict = db_replacement.__dict__.copy()
-        result_dict.pop('warning_notified', None)
-        result_dict.pop('critical_notified', None)
-        result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('component_type'):
-            result_dict['component_type'] = ComponentType(result_dict['component_type'])
-        return Replacement(**result_dict)
+        return self._to_replacement(db_replacement)
 
     def find_by_id(self, replacement_id: int) -> Optional[Replacement]:
         """Найти замену по id."""
@@ -51,13 +57,7 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        result_dict = db_replacement.__dict__.copy()
-        result_dict.pop('warning_notified', None)
-        result_dict.pop('critical_notified', None)
-        result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('component_type'):
-            result_dict['component_type'] = ComponentType(result_dict['component_type'])
-        return Replacement(**result_dict)
+        return self._to_replacement(db_replacement)
 
     def find_by_vehicle_ids(self, vehicle_ids: list[int]) -> List[Replacement]:
         """Найти все замены для списка автомобилей."""
@@ -65,17 +65,7 @@ class ReplacementRepository:
             ReplacementDB.vehicle_id.in_(vehicle_ids)
         ).all()
 
-        result = []
-        for r in db_replacements:
-            result_dict = r.__dict__.copy()
-            result_dict.pop('_sa_instance_state', None)
-            result_dict.pop('warning_notified', None)
-            result_dict.pop('critical_notified', None)
-            result_dict.pop('overdue_notified_at_km', None)
-            if result_dict.get('component_type'):
-                result_dict['component_type'] = ComponentType(result_dict['component_type'])
-            result.append(Replacement(**result_dict))
-        return result
+        return [self._to_replacement(replacement) for replacement in db_replacements]
 
     def find_by_vehicle_id(self, vehicle_id: int) -> List[Replacement]:
         """Найти все замены для автомобиля."""
@@ -83,16 +73,7 @@ class ReplacementRepository:
             ReplacementDB.vehicle_id == vehicle_id
         ).all()
 
-        result = []
-        for r in db_replacements:
-            result_dict = r.__dict__.copy()
-            result_dict.pop('warning_notified', None)
-            result_dict.pop('critical_notified', None)
-            result_dict.pop('overdue_notified_at_km', None)
-            if result_dict.get('component_type'):
-                result_dict['component_type'] = ComponentType(result_dict['component_type'])
-            result.append(Replacement(**result_dict))
-        return result
+        return [self._to_replacement(replacement) for replacement in db_replacements]
 
     def find_by_vehicle_and_component(
             self,
@@ -105,16 +86,7 @@ class ReplacementRepository:
             ReplacementDB.component_type == component_type.value
         ).all()
 
-        result = []
-        for r in db_replacements:
-            result_dict = r.__dict__.copy()
-            result_dict.pop('warning_notified', None)
-            result_dict.pop('critical_notified', None)
-            result_dict.pop('overdue_notified_at_km', None)
-            if result_dict.get('component_type'):
-                result_dict['component_type'] = ComponentType(result_dict['component_type'])
-            result.append(Replacement(**result_dict))
-        return result
+        return [self._to_replacement(replacement) for replacement in db_replacements]
 
     def find_by_vehicle_component_and_km(
         self,
@@ -132,13 +104,7 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        result_dict = db_replacement.__dict__.copy()
-        result_dict.pop('warning_notified', None)
-        result_dict.pop('critical_notified', None)
-        result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('component_type'):
-            result_dict['component_type'] = ComponentType(result_dict['component_type'])
-        return Replacement(**result_dict)
+        return self._to_replacement(db_replacement)
 
     def get_last_replacement(
             self,
@@ -154,13 +120,7 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        result_dict = db_replacement.__dict__.copy()
-        result_dict.pop('warning_notified', None)
-        result_dict.pop('critical_notified', None)
-        result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('component_type'):
-            result_dict['component_type'] = ComponentType(result_dict['component_type'])
-        return Replacement(**result_dict)
+        return self._to_replacement(db_replacement)
 
     def find_previous_replacement(
         self,
@@ -178,13 +138,7 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        result_dict = db_replacement.__dict__.copy()
-        result_dict.pop('warning_notified', None)
-        result_dict.pop('critical_notified', None)
-        result_dict.pop('overdue_notified_at_km', None)
-        if result_dict.get('component_type'):
-            result_dict['component_type'] = ComponentType(result_dict['component_type'])
-        return Replacement(**result_dict)
+        return self._to_replacement(db_replacement)
 
     def find_neighbors(
         self,
@@ -194,16 +148,6 @@ class ReplacementRepository:
         exclude_id: int,
     ) -> tuple[Optional[Replacement], Optional[Replacement]]:
         """Найти предыдущую (max_km < km) и следующую (min_km > km) замену, исключая указанный ID."""
-        def _to_replacement(db_row: ReplacementDB) -> Replacement:
-            result_dict = db_row.__dict__.copy()
-            result_dict.pop('_sa_instance_state', None)
-            result_dict.pop('warning_notified', None)
-            result_dict.pop('critical_notified', None)
-            result_dict.pop('overdue_notified_at_km', None)
-            if result_dict.get('component_type'):
-                result_dict['component_type'] = ComponentType(result_dict['component_type'])
-            return Replacement(**result_dict)
-
         base_filter = (
             ReplacementDB.vehicle_id == vehicle_id,
             ReplacementDB.component_type == component_type.value,
@@ -224,8 +168,8 @@ class ReplacementRepository:
         )
 
         return (
-            _to_replacement(prev_row) if prev_row else None,
-            _to_replacement(next_row) if next_row else None,
+            self._to_replacement(prev_row) if prev_row else None,
+            self._to_replacement(next_row) if next_row else None,
         )
 
     def get_last_replacement_with_notify(
@@ -282,22 +226,22 @@ class ReplacementRepository:
         )
 
         best_by_type: dict[str, ReplacementDB] = {}
-        for r in rows:
-            key = r.component_type
-            if key not in best_by_type or r.id > best_by_type[key].id:
-                best_by_type[key] = r
+        for replacement in rows:
+            key = replacement.component_type
+            if key not in best_by_type or replacement.id > best_by_type[key].id:
+                best_by_type[key] = replacement
 
         return [
             {
-                "id": r.id,
-                "component_type": r.component_type,
-                "km_at_replacement": r.km_at_replacement,
-                "interval_km": r.interval_km,
-                "warning_notified": r.warning_notified,
-                "critical_notified": r.critical_notified,
-                "overdue_notified_at_km": r.overdue_notified_at_km,
+                "id": replacement.id,
+                "component_type": replacement.component_type,
+                "km_at_replacement": replacement.km_at_replacement,
+                "interval_km": replacement.interval_km,
+                "warning_notified": replacement.warning_notified,
+                "critical_notified": replacement.critical_notified,
+                "overdue_notified_at_km": replacement.overdue_notified_at_km,
             }
-            for r in best_by_type.values()
+            for replacement in best_by_type.values()
         ]
 
     def update_notify_tracking(
@@ -342,10 +286,4 @@ class ReplacementRepository:
         """Получить все замены."""
         db_replacements = self.db.query(ReplacementDB).all()
 
-        result = []
-        for r in db_replacements:
-            result_dict = r.__dict__.copy()
-            if result_dict.get('component_type'):
-                result_dict['component_type'] = ComponentType(result_dict['component_type'])
-            result.append(Replacement(**result_dict))
-        return result
+        return [self._to_replacement(replacement) for replacement in db_replacements]
