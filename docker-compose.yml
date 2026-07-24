@@ -1,8 +1,8 @@
 services:
   backend:
     build: .
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./data:/data
     environment:
@@ -22,8 +22,8 @@ services:
 
   frontend:
     build: ../change_liquid_frontend
-    ports:
-      - "80:80"
+    expose:
+      - "80"
     depends_on:
       - backend
     restart: always
@@ -31,3 +31,21 @@ services:
       resources:
         limits:
           memory: 50M
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:
