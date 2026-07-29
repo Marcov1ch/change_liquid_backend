@@ -55,11 +55,11 @@ make run
 
 ### Собрать образ
 ```shell script
-docker-compose build --no-cache
+docker compose -f docker-compose.yml -f docker-compose.dev.yml build
 ```
 ### Запустить контейнер
 ```shell script
-docker-compose up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 ### Посмотреть логи контейнера
 ```shell script

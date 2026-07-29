@@ -2,11 +2,35 @@ services:
   backend:
     ports:
       - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/app.db
+      - SECRET_KEY=${SECRET_KEY}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM}
+      - FRONTEND_URL=http://localhost
 
   frontend:
-    ports:
-      - "80:80"
+    environment:
+      - BACKEND_URL=http://backend:8000
 
   caddy:
-    profiles:
-      - prod
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:
