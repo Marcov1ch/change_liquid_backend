@@ -3,7 +3,7 @@ from typing import Final
 
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.interval_utils import get_last_per_type
-from app.services.dto import VehicleDTO, ReplacementDTO
+from app.services.dto import VehicleDTO
 
 _OVERDUE: Final[int] = 50
 _CRITICAL: Final[int] = 250
