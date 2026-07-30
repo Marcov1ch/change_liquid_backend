@@ -10,6 +10,7 @@ from app.db.database import init_db
 from app.db.migrate import run_migrations
 from app.auth.handler import router as auth_router
 from app.common.middleware import LoggingMiddleware
+from app.services.scheduler import start_scheduler
 
 
 def create_app() -> FastAPI:
@@ -38,6 +39,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
 
     setup_routes(app)
+
+    start_scheduler()
 
     return app
 

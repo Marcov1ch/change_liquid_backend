@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Final
 
 from app.common.enums import StatusEnum, ComponentType
@@ -7,9 +8,44 @@ _OVERDUE: Final[int] = 250
 _CRITICAL: Final[int] = 500
 _WARNING: Final[int] = 1000
 
+_DATE_WARNING_DAYS: Final[int] = 5
+
 
 class StatusCalculator:
     """Калькулятор статусов замен."""
+
+    @staticmethod
+    def calculate_date_status(
+        next_change_date: date | None,
+    ) -> dict:
+        """Рассчитать статус замены по дате (для шин и date-based компонентов)."""
+        if next_change_date is None:
+            return {
+                "next_change_date": None,
+                "days_remaining": None,
+                "status": StatusEnum.UNKNOWN.value,
+                "status_message": "🟡 Дата не указана",
+            }
+
+        today = date.today()
+        days_remaining = (next_change_date - today).days
+
+        if days_remaining < 0:
+            status = StatusEnum.OVERDUE.value
+            message = f"🔴 ПРОСРОЧЕНО на {-days_remaining} дн."
+        elif days_remaining <= _DATE_WARNING_DAYS:
+            status = StatusEnum.WARNING.value
+            message = f"🟡 СКОРО! Осталось {days_remaining} дн."
+        else:
+            status = StatusEnum.GOOD.value
+            message = f"🟢 Замена через {days_remaining} дн."
+
+        return {
+            "next_change_date": next_change_date,
+            "days_remaining": days_remaining,
+            "status": status,
+            "status_message": message,
+        }
 
     @staticmethod
     def calculate_status(
@@ -65,13 +101,17 @@ class StatusCalculator:
 
         has_warning = False
         for replacement in last_by_type.values():
-            interval = vehicle_dto.intervals.get(replacement.component_type.value)
-            if interval is None:
-                continue
-            status = StatusCalculator.calculate_status(
-                replacement.km_at_replacement,
-                interval,
-                vehicle_dto.current_km)['status']
+            if replacement.component_type == ComponentType.TIRE_CHANGE:
+                date_result = StatusCalculator.calculate_date_status(replacement.next_change_date)
+                status = date_result['status']
+            else:
+                interval = vehicle_dto.intervals.get(replacement.component_type.value)
+                if interval is None:
+                    continue
+                status = StatusCalculator.calculate_status(
+                    replacement.km_at_replacement,
+                    interval,
+                    vehicle_dto.current_km)['status']
             if status == StatusEnum.OVERDUE.value:
                 return StatusEnum.OVERDUE.value  # type: ignore[no-any-return]
             if status == StatusEnum.CRITICAL.value:

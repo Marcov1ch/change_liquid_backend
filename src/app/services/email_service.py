@@ -63,6 +63,49 @@ def send_reset_password_email(to_email: str, token: str) -> None:
     _send_email(to_email, subject, body)
 
 
+def send_date_notification_email(
+    to_email: str,
+    username: str,
+    brand: str,
+    model: str,
+    plate_number: str,
+    component_name: str,
+    next_change_date: str,
+    days_remaining: int,
+    is_overdue: bool = False,
+) -> None:
+    """Отправить email о date-based замене (шины)."""
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+    if is_overdue:
+        emoji = "🔴"
+        status_text = "Просрочено! Требуется замена!"
+    else:
+        emoji = "🟡"
+        status_text = "Скоро требуется замена"
+
+    days_str = f"просрочено на {-days_remaining} дн." if is_overdue else f"осталось {days_remaining} дн."
+
+    subject = f"Car Liquid Tracker — {component_name}: требуется замена"
+
+    body = f"""
+    <h2>{emoji} {status_text}</h2>
+    <p>Здравствуйте, <strong>{username}</strong>!</p>
+    <p>По данным системы, на автомобиле <strong>{brand} {model}</strong> ({plate_number})<br>
+    {component_name}: {days_str}</p>
+    <p><strong>Дата следующей замены:</strong> {next_change_date}</p>
+    <hr>
+    <p style="font-size: 12px; color: #888;">
+        Если вы не хотите получать уведомления,
+        отключите их в настройках автомобиля:
+        <br>
+        <a href="{frontend_url}/">Перейти в настройки</a>
+    </p>
+    """
+
+    _send_email(to_email, subject, body)
+
+
 def _pick_worst_status(items: list[ComponentNotificationItem]) -> str:
     return max(items, key=lambda x: STATUS_ORDER.get(x.status, 0)).status
 

@@ -29,28 +29,32 @@ class ReplacementService:
         if not vehicle_dto:
             raise ValueError(ERROR_MESSAGES['vehicle_not_found'].format(vehicle_id=vehicle_id))
 
-        self._validate_common(
-            request.km_at_replacement,
-            request.replacement_date,
-        )
-        self._validate_sequence(
-            vehicle_id,
-            request.component_type,
-            request.km_at_replacement,
-            request.replacement_date,
-            exclude_id=None,
-        )
-        self._validate_no_duplicate(
-            vehicle_id,
-            request.component_type,
-            request.km_at_replacement,
-        )
-        self._update_vehicle_km_if_needed(
-            vehicle_dto,
-            request.km_at_replacement,
-        )
+        is_tire = request.component_type == ComponentType.TIRE_CHANGE
 
-        interval_km = ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type)
+        if not is_tire:
+            self._validate_common(
+                request.km_at_replacement,
+                request.replacement_date,
+            )
+            self._validate_sequence(
+                vehicle_id,
+                request.component_type,
+                request.km_at_replacement,
+                request.replacement_date,
+                exclude_id=None,
+            )
+            self._validate_no_duplicate(
+                vehicle_id,
+                request.component_type,
+                request.km_at_replacement,
+            )
+            self._update_vehicle_km_if_needed(
+                vehicle_dto,
+                request.km_at_replacement,
+            )
+
+        interval_km = (0 if is_tire
+                       else ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type))
 
         replacement = Replacement(
             id=None,
@@ -62,6 +66,7 @@ class ReplacementService:
             replacement_date=request.replacement_date,
             km_at_replacement=request.km_at_replacement,
             interval_km=interval_km,
+            next_change_date=request.next_change_date,
         )
 
         saved = self.repository.save(replacement)
@@ -179,6 +184,7 @@ class ReplacementService:
             replacement_date=replacement.replacement_date,
             km_at_replacement=replacement.km_at_replacement,
             interval_km=replacement.interval_km,
+            next_change_date=replacement.next_change_date,
         )
 
     def _validate_common(

@@ -27,5 +27,10 @@ class Replacement(ReplacementBase):
     interval_km: int = Field(
         ...,
         description='Интервал замены (км)',
-        ge=1000,
+        ge=0,
+    )
+    next_change_date: date | None = Field(
+        None,
+        description='Дата следующей обязательной замены (для date-based компонентов)',
+        examples=['2026-11-01'],
     )

@@ -12,7 +12,7 @@ from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.common.middleware import verify_vehicle_access, verify_replacement_access
-from app.common.enums import StatusEnum
+from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.calculator import StatusCalculator
 from app.services.notification_service import check_vehicle_notifications
 
@@ -27,6 +27,8 @@ class ReplacementHandler:
         is_latest: bool = True,
     ) -> ReplacementResponse:
         """Преобразовать DTO в Response с расчётом статуса."""
+        is_tire = replacement_dto.component_type == ComponentType.TIRE_CHANGE
+
         if not is_latest:
             return ReplacementResponse(
                 id=replacement_dto.id,
@@ -40,8 +42,32 @@ class ReplacementHandler:
                 interval_km=replacement_dto.interval_km,
                 next_replacement_km=0,
                 km_remaining=0,
+                next_change_date=replacement_dto.next_change_date,
+                days_remaining=None,
                 status=StatusEnum.REPLACED.value,
                 status_message="📌 Заменено",
+            )
+
+        if is_tire:
+            status_data = StatusCalculator.calculate_date_status(
+                replacement_dto.next_change_date,
+            )
+            return ReplacementResponse(
+                id=replacement_dto.id,
+                vehicle_id=replacement_dto.vehicle_id,
+                component_type=replacement_dto.component_type,
+                component_name=replacement_dto.component_name,
+                component_price=replacement_dto.component_price,
+                work_price=replacement_dto.work_price,
+                replacement_date=replacement_dto.replacement_date,
+                km_at_replacement=replacement_dto.km_at_replacement,
+                interval_km=replacement_dto.interval_km,
+                next_replacement_km=0,
+                km_remaining=0,
+                next_change_date=status_data["next_change_date"],
+                days_remaining=status_data["days_remaining"],
+                status=status_data["status"],
+                status_message=status_data["status_message"],
             )
 
         interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
@@ -63,6 +89,8 @@ class ReplacementHandler:
             interval_km=replacement_dto.interval_km,
             next_replacement_km=status_data["next_replacement_km"],
             km_remaining=status_data["km_remaining"],
+            next_change_date=None,
+            days_remaining=None,
             status=status_data["status"],
             status_message=status_data["status_message"]
         )

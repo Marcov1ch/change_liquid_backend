@@ -53,7 +53,5 @@ jobs:
           script: |
             cd ~/change_liquid_app/change_liquid_backend
             git pull
-            docker compose down
-            docker compose build
-            docker compose up -d
+            docker compose up -d --build
             docker image prune -f

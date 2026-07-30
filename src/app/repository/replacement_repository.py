@@ -19,6 +19,9 @@ class ReplacementRepository:
         result_dict.pop('warning_notified', None)
         result_dict.pop('critical_notified', None)
         result_dict.pop('overdue_notified_at_km', None)
+        result_dict.pop('date_warning_notified', None)
+        result_dict.pop('date_overdue_notified', None)
+        result_dict.pop('interval_months', None)
         if result_dict.get('component_type'):
             result_dict['component_type'] = ComponentType(result_dict['component_type'])
         return Replacement(**result_dict)
@@ -188,11 +191,16 @@ class ReplacementRepository:
 
         return {
             "id": db_replacement.id,
+            "component_type": db_replacement.component_type,
+            "component_name": db_replacement.component_name,
             "km_at_replacement": db_replacement.km_at_replacement,
             "interval_km": db_replacement.interval_km,
             "warning_notified": db_replacement.warning_notified,
             "critical_notified": db_replacement.critical_notified,
             "overdue_notified_at_km": db_replacement.overdue_notified_at_km,
+            "next_change_date": db_replacement.next_change_date,
+            "date_warning_notified": db_replacement.date_warning_notified,
+            "date_overdue_notified": db_replacement.date_overdue_notified,
         }
 
     def get_last_replacements_with_notify(
@@ -261,6 +269,23 @@ class ReplacementRepository:
             if critical_notified is not None:
                 db_replacement.critical_notified = critical_notified
             db_replacement.overdue_notified_at_km = overdue_notified_at_km
+            self.db.commit()
+
+    def update_date_notify_tracking(
+        self,
+        replacement_id: int,
+        date_warning_notified: bool | None = None,
+        date_overdue_notified: bool | None = None,
+    ) -> None:
+        """Обновить флаги date-based уведомлений."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.id == replacement_id
+        ).first()
+        if db_replacement:
+            if date_warning_notified is not None:
+                db_replacement.date_warning_notified = date_warning_notified
+            if date_overdue_notified is not None:
+                db_replacement.date_overdue_notified = date_overdue_notified
             self.db.commit()
 
     def delete(self, replacement_id: int) -> bool:
