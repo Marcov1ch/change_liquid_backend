@@ -9,6 +9,7 @@ class ComponentType(Enum):
     BRAKE_FLUID = "brake_fluid"
     POWER_STEERING_FLUID = "power_steering_fluid"
     DIFFERENTIAL_OIL = "differential_oil"
+    TIRE_CHANGE = "tire_change"
 
 
 class StatusEnum(Enum):

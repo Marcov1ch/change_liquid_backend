@@ -20,6 +20,7 @@ class VehicleRepository:
         for cfg in COMPONENTS_CONFIG:
             intervals[cfg.type.value] = getattr(db_vehicle, cfg.interval_field)
             notify_flags[cfg.type.value] = getattr(db_vehicle, cfg.notify_field)
+        notify_flags['tire_change'] = bool(getattr(db_vehicle, 'tire_notify_enabled', True))
         return VehicleDTO(
             id=db_vehicle.id,
             brand=db_vehicle.brand_ref.name,
@@ -40,6 +41,9 @@ class VehicleRepository:
         for cfg in COMPONENTS_CONFIG:
             setattr(db_vehicle, cfg.interval_field, dto.intervals.get(cfg.type.value, cfg.default_interval))
             setattr(db_vehicle, cfg.notify_field, dto.notify_flags.get(cfg.type.value, True))
+        tire_notify = dto.notify_flags.get('tire_change')
+        if tire_notify is not None:
+            db_vehicle.tire_notify_enabled = tire_notify
 
     def save(self, dto: VehicleDTO) -> VehicleDTO:
         """Создать или обновить запись об автомобиле."""
@@ -167,6 +171,7 @@ class VehicleRepository:
             for cfg in COMPONENTS_CONFIG:
                 intervals[cfg.type.value] = getattr(v, cfg.interval_field)
                 notify_flags[cfg.type.value] = getattr(v, cfg.notify_field)
+            notify_flags['tire_change'] = bool(getattr(v, 'tire_notify_enabled', True))
             result.append({
                 "id": v.id,
                 "brand": v.brand_ref.name,

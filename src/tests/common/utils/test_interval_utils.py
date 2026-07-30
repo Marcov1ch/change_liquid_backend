@@ -47,7 +47,7 @@ def test_get_interval_for_component(
     assert ComponentIntervalUtils.get_interval_for_component(vehicle, component_type) == expected
 
 
-ALL_COMPONENTS = list(ComponentType)
+ALL_COMPONENTS = [c for c in ComponentType if c != ComponentType.TIRE_CHANGE]
 
 
 @pytest.mark.parametrize(

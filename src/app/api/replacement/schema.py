@@ -18,6 +18,11 @@ class ReplacementCreateRequest(ReplacementBase):
         examples=[15000],
         ge=0,
     )
+    next_change_date: date | None = Field(
+        None,
+        description='Дата следующей обязательной замены (для шин)',
+        examples=['2026-11-01'],
+    )
 
 
 class ReplacementResponse(ReplacementBase):
@@ -50,6 +55,14 @@ class ReplacementResponse(ReplacementBase):
         ...,
         description='Остаток в километрах до замены',
     )
+    next_change_date: date | None = Field(
+        None,
+        description='Дата следующей обязательной замены',
+    )
+    days_remaining: int | None = Field(
+        None,
+        description='Остаток дней до замены',
+    )
     status: StatusEnum = Field(
         ...,
         description='Статус замены',
@@ -66,6 +79,7 @@ class UpdateReplacementRequest(ReplacementBase):
     component_name: str | None = None
     replacement_date: date | None = None
     km_at_replacement: int | None = Field(None, ge=0)
+    next_change_date: date | None = None
 
 
 class ReplacementsBulkRequest(BaseModel):
