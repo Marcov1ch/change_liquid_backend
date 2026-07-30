@@ -152,19 +152,11 @@ def _check_vehicle(
                 ))
 
         elif status == StatusEnum.CRITICAL.value:
-            if km_remaining > 0 and not warning_flag:
+            if not critical_flag:
                 pending.append(_PendingItem(
                     last=last, comp_key=comp_key,
                     km_remaining=km_remaining, status=status,
                     warning_notified=True,
-                    critical_notified=False,
-                    overdue_notified_at_km=None,
-                ))
-            elif km_remaining == 0 and not critical_flag:
-                pending.append(_PendingItem(
-                    last=last, comp_key=comp_key,
-                    km_remaining=km_remaining, status=status,
-                    warning_notified=False,
                     critical_notified=True,
                     overdue_notified_at_km=None,
                 ))

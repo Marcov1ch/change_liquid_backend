@@ -14,6 +14,7 @@ from app.services.vehicle_service import VehicleService
 from app.common.middleware import verify_vehicle_access, verify_replacement_access
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.calculator import StatusCalculator
+from app.common.utils.interval_utils import get_last_per_type
 from app.services.notification_service import check_vehicle_notifications
 
 
@@ -136,20 +137,12 @@ class ReplacementHandler:
         try:
             replacements_dto = replacement_service.get_by_vehicle(vehicle.id)
 
-            def _type_key(replacement: ReplacementDTO) -> tuple[int, int]:
-                return (replacement.km_at_replacement, replacement.id or 0)
-
-            latest_per_type: dict[str, tuple[int, int]] = {}
-            for replacement in replacements_dto:
-                key = replacement.component_type.value
-                tup = _type_key(replacement)
-                if key not in latest_per_type or tup > latest_per_type[key]:
-                    latest_per_type[key] = tup
+            last_by_type = get_last_per_type(replacements_dto)
 
             result = []
             for replacement in replacements_dto:
-                latest_tup = latest_per_type.get(replacement.component_type.value)
-                is_latest = latest_tup is not None and (replacement.km_at_replacement, replacement.id or 0) == latest_tup
+                last = last_by_type.get(replacement.component_type)
+                is_latest = last is not None and (replacement.km_at_replacement, replacement.id or 0) == (last.km_at_replacement, last.id or 0)
                 result.append(self._to_response(replacement, vehicle, is_latest))
             return result
         except HTTPException:

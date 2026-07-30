@@ -20,6 +20,7 @@ from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import StatusCalculator
+from app.common.utils.interval_utils import get_last_per_type
 from app.services.notification_service import check_vehicle_notifications
 
 
@@ -65,15 +66,7 @@ class VehicleHandler:
         replacements: list[ReplacementDTO],
     ) -> VehicleResponse:
         """Обогатить ответ остатками км до замен."""
-        last_by_type: dict[ComponentType, ReplacementDTO] = {}
-        for replacement in replacements:
-            prev = last_by_type.get(replacement.component_type)
-            if prev is None:
-                last_by_type[replacement.component_type] = replacement
-            elif replacement.km_at_replacement > prev.km_at_replacement:
-                last_by_type[replacement.component_type] = replacement
-            elif replacement.km_at_replacement == prev.km_at_replacement and (replacement.id or 0) > (prev.id or 0):
-                last_by_type[replacement.component_type] = replacement
+        last_by_type = get_last_per_type(replacements)
 
         for config in COMPONENTS_CONFIG:
             last = last_by_type.get(config.type)
