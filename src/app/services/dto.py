@@ -34,3 +34,4 @@ class ReplacementDTO:
     km_at_replacement: int
     interval_km: int
     next_change_date: date | None = None
+    interval_months: int | None = None

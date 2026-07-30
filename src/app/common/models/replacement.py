@@ -34,3 +34,7 @@ class Replacement(ReplacementBase):
         description='Дата следующей обязательной замены (для date-based компонентов)',
         examples=['2026-11-01'],
     )
+    interval_months: int | None = Field(
+        None,
+        description='Интервал замены в месяцах',
+    )

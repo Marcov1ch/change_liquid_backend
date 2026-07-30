@@ -185,6 +185,7 @@ class ReplacementService:
             km_at_replacement=replacement.km_at_replacement,
             interval_km=replacement.interval_km,
             next_change_date=replacement.next_change_date,
+            interval_months=replacement.interval_months,
         )
 
     def _validate_common(

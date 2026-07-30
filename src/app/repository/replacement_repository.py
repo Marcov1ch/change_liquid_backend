@@ -21,7 +21,6 @@ class ReplacementRepository:
         result_dict.pop('overdue_notified_at_km', None)
         result_dict.pop('date_warning_notified', None)
         result_dict.pop('date_overdue_notified', None)
-        result_dict.pop('interval_months', None)
         if result_dict.get('component_type'):
             result_dict['component_type'] = ComponentType(result_dict['component_type'])
         return Replacement(**result_dict)

@@ -149,7 +149,7 @@ class ReplacementHandler:
             result = []
             for replacement in replacements_dto:
                 latest_tup = latest_per_type.get(replacement.component_type.value)
-                is_latest = latest_tup is not None and replacement.km_at_replacement == latest_tup[0]
+                is_latest = latest_tup is not None and (replacement.km_at_replacement, replacement.id or 0) == latest_tup
                 result.append(self._to_response(replacement, vehicle, is_latest))
             return result
         except HTTPException:
