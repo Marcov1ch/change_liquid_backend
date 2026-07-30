@@ -36,6 +36,7 @@ def test_raises_on_duplicate(
     request.replacement_date = date(2024, 1, 1)
     request.component_price = 0
     request.work_price = 0
+    request.next_change_date = None
 
     existing = Replacement(
         id=1, vehicle_id=1,
@@ -71,6 +72,7 @@ def test_no_error_on_different_km(
     request.component_price = 0
     request.work_price = 0
     request.interval_km = 7000
+    request.next_change_date = None
 
     existing = Replacement(
         id=1, vehicle_id=1,
