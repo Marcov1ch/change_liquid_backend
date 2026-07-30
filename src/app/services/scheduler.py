@@ -44,45 +44,57 @@ def _check_date_notifications() -> None:
             days_remaining = (next_change_date - today).days
 
             if days_remaining <= 0 and not last_repl.get("date_overdue_notified"):
-                replacement_repo.update_date_notify_tracking(
-                    last_repl["id"],
-                    date_overdue_notified=True,
-                )
-                send_date_notification_email(
-                    to_email=vehicle["owner_email"],
-                    username=vehicle["owner_username"],
-                    brand=vehicle["brand"],
-                    model=vehicle["model"],
-                    plate_number=vehicle["plate_number"],
-                    component_name=last_repl["component_name"],
-                    next_change_date=next_change_date.isoformat(),
-                    days_remaining=days_remaining,
-                    is_overdue=True,
-                )
-                logger.info(
-                    "Date overdue email sent for vehicle %s, component %s",
-                    vehicle["id"], last_repl["component_name"],
-                )
+                try:
+                    send_date_notification_email(
+                        to_email=vehicle["owner_email"],
+                        username=vehicle["owner_username"],
+                        brand=vehicle["brand"],
+                        model=vehicle["model"],
+                        plate_number=vehicle["plate_number"],
+                        component_name=last_repl["component_name"],
+                        next_change_date=next_change_date.isoformat(),
+                        days_remaining=days_remaining,
+                        is_overdue=True,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to send date overdue email for vehicle %s, component %s",
+                        vehicle["id"], last_repl["component_name"],
+                    )
+                else:
+                    replacement_repo.update_date_notify_tracking(
+                        last_repl["id"], date_overdue_notified=True,
+                    )
+                    logger.info(
+                        "Date overdue email sent for vehicle %s, component %s",
+                        vehicle["id"], last_repl["component_name"],
+                    )
             elif 0 < days_remaining <= DATE_WARNING_DAYS and not last_repl.get("date_warning_notified"):
-                replacement_repo.update_date_notify_tracking(
-                    last_repl["id"],
-                    date_warning_notified=True,
-                )
-                send_date_notification_email(
-                    to_email=vehicle["owner_email"],
-                    username=vehicle["owner_username"],
-                    brand=vehicle["brand"],
-                    model=vehicle["model"],
-                    plate_number=vehicle["plate_number"],
-                    component_name=last_repl["component_name"],
-                    next_change_date=next_change_date.isoformat(),
-                    days_remaining=days_remaining,
-                    is_overdue=False,
-                )
-                logger.info(
-                    "Date warning email sent for vehicle %s, component %s",
-                    vehicle["id"], last_repl["component_name"],
-                )
+                try:
+                    send_date_notification_email(
+                        to_email=vehicle["owner_email"],
+                        username=vehicle["owner_username"],
+                        brand=vehicle["brand"],
+                        model=vehicle["model"],
+                        plate_number=vehicle["plate_number"],
+                        component_name=last_repl["component_name"],
+                        next_change_date=next_change_date.isoformat(),
+                        days_remaining=days_remaining,
+                        is_overdue=False,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to send date warning email for vehicle %s, component %s",
+                        vehicle["id"], last_repl["component_name"],
+                    )
+                else:
+                    replacement_repo.update_date_notify_tracking(
+                        last_repl["id"], date_warning_notified=True,
+                    )
+                    logger.info(
+                        "Date warning email sent for vehicle %s, component %s",
+                        vehicle["id"], last_repl["component_name"],
+                    )
     except Exception:
         logger.exception("Error in _check_date_notifications")
     finally:

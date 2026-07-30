@@ -51,7 +51,7 @@ def send_reset_password_email(to_email: str, token: str) -> None:
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset-password?token={token}"
 
-    subject = "Восстановление пароля — Car Liquid Tracker"
+    subject = "Восстановление пароля — Change Liquid"
     body = f"""
     <h2>Восстановление пароля</h2>
     <p>Вы запросили восстановление пароля. Перейдите по ссылке ниже, чтобы задать новый пароль:</p>
@@ -86,7 +86,7 @@ def send_date_notification_email(
 
     days_str = f"просрочено на {-days_remaining} дн." if is_overdue else f"осталось {days_remaining} дн."
 
-    subject = f"Car Liquid Tracker — {component_name}: требуется замена"
+    subject = f"Change Liquid — {component_name}: требуется замена"
 
     body = f"""
     <h2>{emoji} {status_text}</h2>
@@ -137,7 +137,7 @@ def send_grouped_notification_email(
 
     first = items[0].component_name
     label = first if len(items) == 1 else f"{len(items)} компонентов"
-    subject = f"Car Liquid Tracker — {label}: требуется замена"
+    subject = f"Change Liquid — {label}: требуется замена"
 
     body = f"""
     <h2>{emoji} {header_text}</h2>
