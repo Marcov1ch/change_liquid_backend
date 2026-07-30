@@ -103,25 +103,37 @@ class TestGetVehicleStatus:
         vehicle: VehicleDTO,
     ) -> None:
         older = ReplacementDTO(
-            id=1, vehicle_id=1,
+            id=1,
+            vehicle_id=1,
             component_type=ComponentType.ENGINE_OIL,
-            component_name='Old', component_price=0, work_price=0,
+            component_name='Old',
+            component_price=0,
+            work_price=0,
             replacement_date=date(2024, 1, 1),
-            km_at_replacement=10000, interval_km=7000,
+            km_at_replacement=10000,
+            interval_km=7000,
         )
         newer = ReplacementDTO(
-            id=2, vehicle_id=1,
+            id=2,
+            vehicle_id=1,
             component_type=ComponentType.ENGINE_OIL,
-            component_name='New', component_price=0, work_price=0,
+            component_name='New',
+            component_price=0,
+            work_price=0,
             replacement_date=date(2024, 6, 1),
-            km_at_replacement=10000, interval_km=7000,
+            km_at_replacement=10000,
+            interval_km=7000,
         )
         current = ReplacementDTO(
-            id=3, vehicle_id=1,
+            id=3,
+            vehicle_id=1,
             component_type=ComponentType.ENGINE_OIL,
-            component_name='Current', component_price=0, work_price=0,
+            component_name='Current',
+            component_price=0,
+            work_price=0,
             replacement_date=date(2025, 1, 1),
-            km_at_replacement=18000, interval_km=7000,
+            km_at_replacement=18000,
+            interval_km=7000,
         )
         result = StatusCalculator.get_vehicle_status(vehicle, [newer, older, current])
         assert result == StatusEnum.GOOD.value
@@ -143,36 +155,55 @@ class TestGetVehicleStatus:
         replacement_good: ReplacementDTO,
     ) -> None:
         no_interval = ReplacementDTO(
-            id=3, vehicle_id=1,
+            id=3,
+            vehicle_id=1,
             component_type=ComponentType.COOLANT,
-            component_name='Antifreeze', component_price=0, work_price=0,
+            component_name='Antifreeze',
+            component_price=0,
+            work_price=0,
             replacement_date=date(2024, 1, 1),
-            km_at_replacement=10000, interval_km=60000,
+            km_at_replacement=10000,
+            interval_km=60000,
         )
         result = StatusCalculator.get_vehicle_status(vehicle, [replacement_good, no_interval])
         assert result == StatusEnum.GOOD.value
 
     def test_two_types_warning_and_good_returns_warning(self) -> None:
         v = VehicleDTO(
-            id=1, brand='', model='', brand_id=1, model_id=1,
-            plate_number='', year=2000, current_km=16000,
-            is_active=True, owner_id=1,
+            id=1,
+            brand='',
+            model='',
+            brand_id=1,
+            model_id=1,
+            plate_number='',
+            year=2000,
+            current_km=16600,
+            is_active=True,
+            owner_id=1,
             intervals={'engine_oil': 7000, 'brake_fluid': 40000},
             notify_flags={},
         )
         close = ReplacementDTO(
-            id=1, vehicle_id=1,
+            id=1,
+            vehicle_id=1,
             component_type=ComponentType.ENGINE_OIL,
-            component_name='Oil', component_price=0, work_price=0,
+            component_name='Oil',
+            component_price=0,
+            work_price=0,
             replacement_date=date(2024, 1, 1),
-            km_at_replacement=10000, interval_km=7000,
+            km_at_replacement=10000,
+            interval_km=7000,
         )
         fresh = ReplacementDTO(
-            id=2, vehicle_id=1,
+            id=2,
+            vehicle_id=1,
             component_type=ComponentType.BRAKE_FLUID,
-            component_name='Brake', component_price=0, work_price=0,
+            component_name='Brake',
+            component_price=0,
+            work_price=0,
             replacement_date=date(2024, 6, 1),
-            km_at_replacement=5000, interval_km=40000,
+            km_at_replacement=5000,
+            interval_km=40000,
         )
         result = StatusCalculator.get_vehicle_status(v, [close, fresh])
         assert result == StatusEnum.WARNING.value

@@ -9,7 +9,7 @@ from app.api.vehicle.schema import (
     VehicleUpdateIntervals,
     UpdateVehicleNotify,
 )
-from app.common.enums import ComponentType, StatusEnum
+from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
 from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
 from app.common.middleware import verify_vehicle_access

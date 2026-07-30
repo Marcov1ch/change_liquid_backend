@@ -7,7 +7,7 @@ def get_last_per_type(
     replacements: list[ReplacementDTO],
 ) -> dict[ComponentType, ReplacementDTO]:
     """Вернуть последнюю замену по каждому типу.
-    
+
     Последняя = max(km_at_replacement), при равных — max(id).
     """
     last_by_type: dict[ComponentType, ReplacementDTO] = {}
@@ -17,7 +17,7 @@ def get_last_per_type(
             last_by_type[replacement.component_type] = replacement
         elif replacement.km_at_replacement > prev.km_at_replacement:
             last_by_type[replacement.component_type] = replacement
-        elif replacement.km_at_replacement == prev.km_at_replacement and (replacement.id or 0) > (prev.id or 0):
+        elif replacement.km_at_replacement == prev.km_at_replacement and (replacement.id or 0) > (prev.id or 0):  # noqa: E501
             last_by_type[replacement.component_type] = replacement
     return last_by_type
 
