@@ -64,6 +64,9 @@ class VehicleDB(Base):  # type: ignore
     coolant_interval_km = Column(Integer)
     power_steering_interval_km = Column(Integer)
     differential_oil_interval_km = Column(Integer)
+    cabin_filter_interval_km = Column(Integer)
+    spark_plugs_interval_km = Column(Integer)
+    air_filter_interval_km = Column(Integer)
 
     oil_notify_enabled = Column(Boolean, default=True)
     transmission_notify_enabled = Column(Boolean, default=True)
@@ -71,6 +74,9 @@ class VehicleDB(Base):  # type: ignore
     coolant_notify_enabled = Column(Boolean, default=True)
     power_steering_notify_enabled = Column(Boolean, default=True)
     differential_oil_notify_enabled = Column(Boolean, default=True)
+    cabin_filter_notify_enabled = Column(Boolean, default=True)
+    spark_plugs_notify_enabled = Column(Boolean, default=True)
+    air_filter_notify_enabled = Column(Boolean, default=True)
 
     oil_interval_months = Column(Integer, nullable=True)
     transmission_interval_months = Column(Integer, nullable=True)
@@ -78,6 +84,9 @@ class VehicleDB(Base):  # type: ignore
     coolant_interval_months = Column(Integer, nullable=True)
     power_steering_interval_months = Column(Integer, nullable=True)
     differential_oil_interval_months = Column(Integer, nullable=True)
+    cabin_filter_interval_months = Column(Integer, nullable=True)
+    spark_plugs_interval_months = Column(Integer, nullable=True)
+    air_filter_interval_months = Column(Integer, nullable=True)
 
     tire_notify_enabled = Column(Boolean, default=True)
 
