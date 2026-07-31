@@ -18,7 +18,7 @@ class VehicleRepository:
         intervals: dict[str, int] = {}
         notify_flags: dict[str, bool] = {}
         for cfg in COMPONENTS_CONFIG:
-            intervals[cfg.type.value] = getattr(db_vehicle, cfg.interval_field)
+            intervals[cfg.type.value] = getattr(db_vehicle, cfg.interval_field) or cfg.default_interval
             notify_flags[cfg.type.value] = getattr(db_vehicle, cfg.notify_field)
         notify_flags['tire_change'] = bool(getattr(db_vehicle, 'tire_notify_enabled', True))
         return VehicleDTO(
@@ -169,7 +169,7 @@ class VehicleRepository:
             intervals: dict[str, int] = {}
             notify_flags: dict[str, bool] = {}
             for cfg in COMPONENTS_CONFIG:
-                intervals[cfg.type.value] = getattr(v, cfg.interval_field)
+                intervals[cfg.type.value] = getattr(v, cfg.interval_field) or cfg.default_interval
                 notify_flags[cfg.type.value] = getattr(v, cfg.notify_field)
             notify_flags['tire_change'] = bool(getattr(v, 'tire_notify_enabled', True))
             result.append({

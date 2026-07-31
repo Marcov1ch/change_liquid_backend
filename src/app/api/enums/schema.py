@@ -38,6 +38,7 @@ class ComponentConfigResponse(BaseModel):
     """Конфигурация одного компонента."""
     key: str
     name: str
+    example: str
     default_interval: int
 
 
