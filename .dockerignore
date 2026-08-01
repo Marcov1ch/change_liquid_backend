@@ -1,0 +1,47 @@
+# Git / CI
+.git/
+.gitignore
+.github/
+
+# Python / кэши
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Тесты — не нужны в образе
+src/tests/
+
+# БД и данные
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Секреты
+.env
+.env.*
+*.env
+
+# IDE
+.idea/
+.vscode/
+
+# Инфраструктура и доки (не копируются в образ)
+docker-compose*.yml
+Dockerfile
+Caddyfile*
+Makefile
+alembic.ini
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
