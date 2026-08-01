@@ -2,7 +2,7 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 from app.common.schemas.base_replacement import ReplacementBase
-from app.common.enums import ComponentType, StatusEnum
+from app.common.enums import StatusEnum
 
 
 class ReplacementCreateRequest(ReplacementBase):
@@ -75,7 +75,6 @@ class ReplacementResponse(ReplacementBase):
 
 class UpdateReplacementRequest(ReplacementBase):
     """Обновление записи о замене."""
-    component_type: ComponentType | None = None
     component_name: str | None = None
     replacement_date: date | None = None
     km_at_replacement: int | None = Field(None, ge=0)

@@ -88,11 +88,6 @@ class VehicleService:
 
         self.validate_km_not_below_replacements(vehicle_id, new_km)
 
-        if new_km < dto.current_km:
-            raise ValueError(
-                f'Новый пробег {new_km} не может быть меньше текущего {dto.current_km}'
-            )
-
         return self.repository.update_km(vehicle_id, new_km)
 
     def update(self, dto: VehicleDTO) -> VehicleDTO | None:
