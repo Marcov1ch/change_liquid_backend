@@ -1,13 +1,21 @@
 from datetime import date
 from sqlalchemy.orm import Session
 from app.api.replacement.schema import ReplacementCreateRequest
-from app.common.messages import ERROR_MESSAGES, VALIDATION_ERRORS
 from app.common.models.replacement import Replacement
 from app.common.enums import ComponentType
 from app.common.utils.interval_utils import ComponentIntervalUtils
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
 from app.services.dto import ReplacementDTO, VehicleDTO
+
+_MSG_VEHICLE_NOT_FOUND = 'Автомобиль с ID {vehicle_id} не найден'
+_MSG_NEGATIVE_KM = 'Пробег не может быть отрицательным'
+_MSG_FUTURE_DATE = 'Дата замены не может быть позже сегодняшнего дня'
+_MSG_KM_LESS_THAN_PREVIOUS = 'Пробег ({km}) не может быть меньше предыдущей замены ({previous_km})'
+_MSG_DATE_LESS_THAN_PREVIOUS = 'Дата ({date}) не может быть раньше предыдущей замены ({previous_date})'
+_MSG_KM_GREATER_THAN_NEXT = 'Пробег ({km}) не может быть больше следующей замены ({next_km})'
+_MSG_DATE_GREATER_THAN_NEXT = 'Дата ({date}) не может быть позже следующей замены ({next_date})'
+_MSG_DUPLICATE_REPLACEMENT = 'Замена с текущим пробегом уже существует'
 
 
 class ReplacementService:
@@ -28,7 +36,7 @@ class ReplacementService:
         if vehicle_dto is None:
             vehicle_dto = self.vehicle_repository.find_active_by_id(vehicle_id)
         if not vehicle_dto:
-            raise ValueError(ERROR_MESSAGES['vehicle_not_found'].format(vehicle_id=vehicle_id))
+            raise ValueError(_MSG_VEHICLE_NOT_FOUND.format(vehicle_id=vehicle_id))
 
         is_tire = request.component_type == ComponentType.TIRE_CHANGE
 
@@ -197,9 +205,9 @@ class ReplacementService:
     ) -> None:
         """Выполнить базовую валидацию пробега и даты."""
         if km < 0:
-            raise ValueError(VALIDATION_ERRORS['negative_km'])
+            raise ValueError(_MSG_NEGATIVE_KM)
         if date_val > date.today():
-            raise ValueError(VALIDATION_ERRORS['future_date'])
+            raise ValueError(_MSG_FUTURE_DATE)
 
     def _validate_sequence(
         self,
@@ -221,25 +229,25 @@ class ReplacementService:
             if prev:
                 if km < prev.km_at_replacement:
                     raise ValueError(
-                        VALIDATION_ERRORS['km_less_than_previous'].format(km=km, previous_km=prev.km_at_replacement))
+                        _MSG_KM_LESS_THAN_PREVIOUS.format(km=km, previous_km=prev.km_at_replacement))
                 if date_val < prev.replacement_date:
                     raise ValueError(
-                        VALIDATION_ERRORS['date_less_than_previous'].format(date=date_val, previous_date=prev.replacement_date))
+                        _MSG_DATE_LESS_THAN_PREVIOUS.format(date=date_val, previous_date=prev.replacement_date))
             if next_r:
                 if km > next_r.km_at_replacement:
                     raise ValueError(
-                        VALIDATION_ERRORS['km_greater_than_next'].format(km=km, next_km=next_r.km_at_replacement))
+                        _MSG_KM_GREATER_THAN_NEXT.format(km=km, next_km=next_r.km_at_replacement))
                 if date_val > next_r.replacement_date:
                     raise ValueError(
-                        VALIDATION_ERRORS['date_greater_than_next'].format(date=date_val, next_date=next_r.replacement_date))
+                        _MSG_DATE_GREATER_THAN_NEXT.format(date=date_val, next_date=next_r.replacement_date))
             return
 
         if km < last.km_at_replacement:
             raise ValueError(
-                VALIDATION_ERRORS['km_less_than_previous'].format(km=km, previous_km=last.km_at_replacement))
+                _MSG_KM_LESS_THAN_PREVIOUS.format(km=km, previous_km=last.km_at_replacement))
         if date_val < last.replacement_date:
             raise ValueError(
-                VALIDATION_ERRORS['date_less_than_previous'].format(date=date_val, previous_date=last.replacement_date))
+                _MSG_DATE_LESS_THAN_PREVIOUS.format(date=date_val, previous_date=last.replacement_date))
 
     def _validate_no_duplicate(
         self,
@@ -252,7 +260,7 @@ class ReplacementService:
             vehicle_id, component_type, km,
         )
         if existing:
-            raise ValueError(VALIDATION_ERRORS['duplicate_replacement'])
+            raise ValueError(_MSG_DUPLICATE_REPLACEMENT)
 
     def _update_vehicle_km_if_needed(
         self,

@@ -12,7 +12,6 @@ from app.api.vehicle.schema import (
 )
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
-from app.common.messages import ERROR_MESSAGES, SUCCESS_MESSAGES
 from app.common.middleware import verify_vehicle_access
 from app.db.database import get_db
 from app.db.models import UserDB
@@ -23,6 +22,9 @@ from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import get_last_per_type
 from app.services.notification_service import check_vehicle_notifications_background
+
+
+_MSG_PLATE_NUMBER_EXISTS = 'Автомобиль с госномером {plate_number} уже существует'
 
 
 class VehicleHandler:
@@ -138,7 +140,7 @@ class VehicleHandler:
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=ERROR_MESSAGES['plate_number_exists'].format(plate_number=request.plate_number),
+                    detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
                 )
 
             vehicle_dto = vehicle_service.create(current_user.id, request)
@@ -171,7 +173,7 @@ class VehicleHandler:
                 if existing and existing.id != vehicle.id:
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
-                        detail=ERROR_MESSAGES['plate_number_exists'].format(plate_number=request.plate_number),
+                        detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
                     )
                 existing_dto.plate_number = request.plate_number
             if request.year is not None:
@@ -204,7 +206,7 @@ class VehicleHandler:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=ERROR_MESSAGES['plate_number_exists'].format(plate_number=request.plate_number),
+                detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
             )
         except Exception as err:
             raise HTTPException(
@@ -294,7 +296,7 @@ class VehicleHandler:
             vehicle_service.delete(vehicle.id)
             return {
                 'status': 'ok',
-                'message': SUCCESS_MESSAGES['vehicle_deleted'].format(vehicle_id=vehicle.id),
+                'message': f'Автомобиль {vehicle.id} успешно удален',
             }
         except HTTPException:
             raise
