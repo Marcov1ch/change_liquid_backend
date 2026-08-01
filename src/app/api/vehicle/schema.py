@@ -1,8 +1,6 @@
-import re
-
 from pydantic import BaseModel, Field, field_validator
 
-from app.common.schemas.base_vehicle import VehicleBase
+from app.common.schemas.base_vehicle import VehicleBase, normalize_plate_number
 
 
 class VehicleCreateRequest(VehicleBase):
@@ -75,22 +73,10 @@ class UpdateVehicleData(BaseModel):
 
     @field_validator('plate_number')
     @classmethod
-    def validate_plate_number(cls, v: str) -> str:
+    def validate_plate_number(cls, v: str | None) -> str | None:
         if v is None:
             return v
-        allowed_letters = 'АВЕІКМНОРСТУХ'
-        patterns = [
-            rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',
-            rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',
-            rf'^\d{{4}}[{allowed_letters}]{{2}}$',
-        ]
-        cleaned = v.replace(' ', '').replace('-', '').upper()
-        if not any(re.match(p, cleaned) for p in patterns):
-            raise ValueError(
-                'Некорректный формат госномера. '
-                'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
-            )
-        return cleaned
+        return normalize_plate_number(v)  # type: ignore[no-any-return]
 
 
 class VehicleUpdateIntervals(BaseModel):

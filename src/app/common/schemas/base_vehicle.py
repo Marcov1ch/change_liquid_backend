@@ -3,6 +3,27 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 
+def normalize_plate_number(value: str) -> str:
+    """Проверка формата госномера (РФ или РБ) и его нормализация."""
+    allowed_letters = 'АВЕІКМНОРСТУХ'
+
+    patterns = [
+        rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',
+        rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',
+        rf'^\d{{4}}[{allowed_letters}]{{2}}$',
+    ]
+
+    cleaned = value.replace(' ', '').replace('-', '').upper()
+
+    if not any(re.match(p, cleaned) for p in patterns):
+        raise ValueError(
+            'Некорректный формат госномера. '
+            'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
+        )
+
+    return cleaned
+
+
 class VehicleBase(BaseModel):
     """Базовая модель авто."""
     brand: str = Field(
@@ -40,20 +61,4 @@ class VehicleBase(BaseModel):
     @classmethod
     def validate_plate_number(cls, v: str) -> str:
         """Проверка формата госномера (РФ или РБ)."""
-        allowed_letters = 'АВЕІКМНОРСТУХ'
-
-        patterns = [
-            rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',
-            rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',
-            rf'^\d{{4}}[{allowed_letters}]{{2}}$',
-        ]
-
-        cleaned = v.replace(' ', '').replace('-', '').upper()
-
-        if not any(re.match(p, cleaned) for p in patterns):
-            raise ValueError(
-                'Некорректный формат госномера. '
-                'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
-            )
-
-        return cleaned
+        return normalize_plate_number(v)
