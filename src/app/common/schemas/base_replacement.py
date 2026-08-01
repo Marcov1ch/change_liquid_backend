@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.common.enums import ComponentType
 
 
@@ -28,3 +28,10 @@ class ReplacementBase(BaseModel):
         examples=[1500],
         ge=0,
     )
+
+    @field_validator('component_name')
+    @classmethod
+    def validate_no_control_chars(cls, v: str) -> str:
+        if any(ord(ch) < 32 for ch in v):
+            raise ValueError('Название компонента не может содержать управляющие символы')
+        return v

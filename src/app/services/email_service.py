@@ -4,6 +4,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 from dataclasses import dataclass
+from html import escape
 
 
 @dataclass
@@ -20,6 +21,16 @@ STATUS_HEADERS = {
     "critical": ("🔴", "Требуется замена!"),
     "warning": ("🟡", "Пора заменить"),
 }
+
+
+def _html(value: object) -> str:
+    """Экранировать значение для безопасной вставки в HTML-тело письма."""
+    return escape(str(value), quote=True)
+
+
+def _header(value: object) -> str:
+    """Санитизировать значение для заголовка письма (убрать CR/LF)."""
+    return str(value).replace('\r', ' ').replace('\n', ' ')
 
 
 def _get_smtp_config() -> dict:
@@ -86,13 +97,14 @@ def send_date_notification_email(
 
     days_str = f"просрочено на {-days_remaining} дн." if is_overdue else f"осталось {days_remaining} дн."
 
-    subject = f"Change Liquid — {component_name}: требуется замена"
+    subject = _header(f"Change Liquid — {component_name}: требуется замена")
 
     body = f"""
     <h2>{emoji} {status_text}</h2>
-    <p>Здравствуйте, <strong>{username}</strong>!</p>
-    <p>По данным системы, на автомобиле <strong>{brand} {model}</strong> ({plate_number})<br>
-    {component_name}: {days_str}</p>
+    <p>Здравствуйте, <strong>{_html(username)}</strong>!</p>
+    <p>По данным системы, на автомобиле
+    <strong>{_html(brand)} {_html(model)}</strong> ({_html(plate_number)})<br>
+    {_html(component_name)}: {days_str}</p>
     <p><strong>Дата следующей замены:</strong> {next_change_date}</p>
     <hr>
     <p style="font-size: 12px; color: #888;">
@@ -131,18 +143,19 @@ def send_grouped_notification_email(
     emoji, header_text = STATUS_HEADERS.get(worst, ("🟡", "Пора заменить"))
 
     comp_items = "".join(
-        f"<li><strong>{item.component_name_genitive}</strong> — {_format_km(item.km_remaining)}</li>"
+        f"<li><strong>{_html(item.component_name_genitive)}</strong> — {_format_km(item.km_remaining)}</li>"
         for item in items
     )
 
     first = items[0].component_name
     label = first if len(items) == 1 else f"{len(items)} компонентов"
-    subject = f"Change Liquid — {label}: требуется замена"
+    subject = _header(f"Change Liquid — {label}: требуется замена")
 
     body = f"""
     <h2>{emoji} {header_text}</h2>
-    <p>Здравствуйте, <strong>{username}</strong>!</p>
-    <p>По данным системы, на автомобиле <strong>{brand} {model}</strong> ({plate_number})<br>
+    <p>Здравствуйте, <strong>{_html(username)}</strong>!</p>
+    <p>По данным системы, на автомобиле
+    <strong>{_html(brand)} {_html(model)}</strong> ({_html(plate_number)})<br>
     требуется замена:</p>
     <ul>{comp_items}</ul>
     <hr>

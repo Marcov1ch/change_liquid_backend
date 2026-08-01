@@ -1,6 +1,8 @@
+import logging
+from typing import List
+
 from fastapi import HTTPException, status, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.api.replacement.schema import (
     ReplacementResponse,
@@ -11,11 +13,18 @@ from app.db.database import get_db
 from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
-from app.common.middleware import verify_vehicle_access, verify_replacement_access
+from app.common.middleware import (
+    verify_vehicle_access,
+    verify_vehicle_view_access,
+    verify_replacement_access,
+    verify_replacement_view_access,
+)
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import get_last_per_type
 from app.services.notification_service import check_vehicle_notifications_background
+
+logger = logging.getLogger(__name__)
 
 
 class ReplacementHandler:
@@ -132,17 +141,18 @@ class ReplacementHandler:
         except HTTPException:
             db.rollback()
             raise
-        except Exception as err:
+        except Exception:
             db.rollback()
+            logger.exception('Failed to create replacements')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось создать замены: {err}',
+                detail='Не удалось создать замены',
             )
 
     async def get_vehicle_replacements(
         self,
         db: Session = Depends(get_db),
-        vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
     ) -> List[ReplacementResponse]:
         """Получить все замены для автомобиля с расчётом статусов."""
         replacement_service = ReplacementService(db)
@@ -160,16 +170,17 @@ class ReplacementHandler:
             return result
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to get vehicle replacements')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось получить замены: {err}',
+                detail='Не удалось получить замены',
             )
 
     async def get_replacement(
         self,
         db: Session = Depends(get_db),
-        replacement: ReplacementDTO = Depends(verify_replacement_access),
+        replacement: ReplacementDTO = Depends(verify_replacement_view_access),
     ) -> ReplacementResponse:
         """Получить конкретную замену по ID."""
         vehicle_service = VehicleService(db)
@@ -179,10 +190,11 @@ class ReplacementHandler:
             return self._to_response(replacement, vehicle)
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to get replacement')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось получить замену: {err}',
+                detail='Не удалось получить замену',
             )
 
     async def update_replacement(
@@ -215,10 +227,11 @@ class ReplacementHandler:
             )
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to update replacement')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось обновить замену: {err}',
+                detail='Не удалось обновить замену',
             )
 
     async def delete_replacement(
@@ -235,10 +248,11 @@ class ReplacementHandler:
             return {'status': 'ok', 'message': f'Замена {replacement.id} удалена'}
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to delete replacement')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось удалить замену: {err}',
+                detail='Не удалось удалить замену',
             )
 
 
