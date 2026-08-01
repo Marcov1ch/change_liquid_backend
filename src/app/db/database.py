@@ -1,7 +1,6 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from app.db.models import Base
 from app.db.seed import seed_brands
 
 
@@ -12,9 +11,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db() -> None:
-    """Создание таблиц и сидирование справочников."""
-    Base.metadata.create_all(bind=engine)
-
+    """Сидирование справочников (схема управляется миграциями)."""
     with SessionLocal() as session:
         seed_brands(session)
 

@@ -71,7 +71,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ## Тесты и качество
 
 ```shell
-make test     # pytest (49 тестов)
+make test     # pytest
 make lint     # flake8
 make mypy     # проверка типов
 make ruff     # ruff
