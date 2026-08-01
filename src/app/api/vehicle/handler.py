@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.api.vehicle.schema import (
@@ -21,7 +21,7 @@ from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import get_last_per_type
-from app.services.notification_service import check_vehicle_notifications
+from app.services.notification_service import check_vehicle_notifications_background
 
 
 class VehicleHandler:
@@ -156,6 +156,7 @@ class VehicleHandler:
         request: UpdateVehicleData,
         db: Session = Depends(get_db),
         vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        background_tasks: BackgroundTasks = BackgroundTasks(),
     ) -> VehicleResponse:
         """Обновить данные авто."""
         vehicle_service = VehicleService(db)
@@ -179,7 +180,10 @@ class VehicleHandler:
             updated_dto = vehicle_service.update(existing_dto)
 
             if request.current_km is not None:
-                check_vehicle_notifications(db, vehicle.id)
+                background_tasks.add_task(
+                    check_vehicle_notifications_background,
+                    vehicle.id,
+                )
 
             return self._to_response(updated_dto)
         except ValueError as err:
@@ -200,6 +204,7 @@ class VehicleHandler:
         request: UpdateKMRequest,
         db: Session = Depends(get_db),
         vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        background_tasks: BackgroundTasks = BackgroundTasks(),
     ) -> VehicleResponse:
         """Обновить пробег авто."""
         vehicle_service = VehicleService(db)
@@ -209,7 +214,10 @@ class VehicleHandler:
                 new_km=request.new_km,
             )
 
-            check_vehicle_notifications(db, vehicle.id)
+            background_tasks.add_task(
+                check_vehicle_notifications_background,
+                vehicle.id,
+            )
 
             return self._to_response(vehicle_dto)
         except ValueError as err:

@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -15,7 +15,7 @@ from app.common.middleware import verify_vehicle_access, verify_replacement_acce
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import get_last_per_type
-from app.services.notification_service import check_vehicle_notifications
+from app.services.notification_service import check_vehicle_notifications_background
 
 
 class ReplacementHandler:
@@ -101,6 +101,7 @@ class ReplacementHandler:
         request: ReplacementsBulkRequest,
         db: Session = Depends(get_db),
         vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        background_tasks: BackgroundTasks = BackgroundTasks(),
     ) -> List[ReplacementResponse]:
         """Создать несколько замен сразу (например, при ТО)."""
         replacement_service = ReplacementService(db)
@@ -117,7 +118,10 @@ class ReplacementHandler:
                 results.append(self._to_response(replacement_dto, vehicle))
 
             db.commit()
-            check_vehicle_notifications(db, vehicle.id)
+            background_tasks.add_task(
+                check_vehicle_notifications_background,
+                vehicle.id,
+            )
             return results
         except ValueError as err:
             db.rollback()
@@ -186,6 +190,7 @@ class ReplacementHandler:
         request: UpdateReplacementRequest,
         db: Session = Depends(get_db),
         replacement: ReplacementDTO = Depends(verify_replacement_access),
+        background_tasks: BackgroundTasks = BackgroundTasks(),
     ) -> ReplacementResponse:
         """Обновить запись о замене."""
         replacement_service = ReplacementService(db)
@@ -197,7 +202,10 @@ class ReplacementHandler:
             update_data = request.model_dump(exclude_none=True)
             replacement_dto = replacement_service.update(replacement.id, **update_data)
 
-            check_vehicle_notifications(db, replacement_dto.vehicle_id)
+            background_tasks.add_task(
+                check_vehicle_notifications_background,
+                replacement_dto.vehicle_id,
+            )
 
             return self._to_response(replacement_dto, vehicle)
         except ValueError as err:

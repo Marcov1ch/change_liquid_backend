@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -237,6 +237,7 @@ async def delete_account(
 @router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(
     request: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> MessageResponse:
     """Отправить письмо для восстановления пароля."""
@@ -260,13 +261,11 @@ async def forgot_password(
         algorithm=ALGORITHM,
     )
 
-    try:
-        send_reset_password_email(to_email=user.email, token=reset_token)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Не удалось отправить письмо. Попробуйте позже.",
-        )
+    background_tasks.add_task(
+        send_reset_password_email,
+        to_email=user.email,
+        token=reset_token,
+    )
 
     return MessageResponse(
         detail="Если такой email зарегистрирован, письмо отправлено"

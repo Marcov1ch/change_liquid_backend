@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
 from app.common.utils.calculator import StatusCalculator
+from app.db.database import SessionLocal
 from app.repository.vehicle_repository import VehicleRepository
 from app.repository.replacement_repository import ReplacementRepository
 from app.services.email_service import (
@@ -186,9 +187,17 @@ def check_vehicle_notifications(db: Session, vehicle_id: int) -> None:
     vehicle_repo = VehicleRepository(db)
     replacement_repo = ReplacementRepository(db)
 
-    vehicles = vehicle_repo.find_all_active_with_owner()
-    vehicle = next((v for v in vehicles if v["id"] == vehicle_id), None)
+    vehicle = vehicle_repo.find_active_with_owner_by_id(vehicle_id)
     if not vehicle:
         return
 
     _check_vehicle(replacement_repo, vehicle)
+
+
+def check_vehicle_notifications_background(vehicle_id: int) -> None:
+    """Проверить уведомления на отдельной сессии БД для фоновой задачи."""
+    db = SessionLocal()
+    try:
+        check_vehicle_notifications(db, vehicle_id)
+    finally:
+        db.close()

@@ -159,6 +159,27 @@ class VehicleRepository:
         ).all()
         return [self._to_dto(v) for v in db_vehicles]
 
+    @staticmethod
+    def _to_owner_dict(v: VehicleDB) -> dict:
+        """Собрать словарь авто с информацией о владельце для уведомлений."""
+        intervals: dict[str, int] = {}
+        notify_flags: dict[str, bool] = {}
+        for cfg in COMPONENTS_CONFIG:
+            intervals[cfg.type.value] = getattr(v, cfg.interval_field) or cfg.default_interval
+            notify_flags[cfg.type.value] = getattr(v, cfg.notify_field)
+        notify_flags['tire_change'] = bool(getattr(v, 'tire_notify_enabled', True))
+        return {
+            "id": v.id,
+            "brand": v.brand_ref.name,
+            "model": v.model_ref.name,
+            "plate_number": v.plate_number,
+            "current_km": v.current_km,
+            "intervals": intervals,
+            "notify_flags": notify_flags,
+            "owner_email": v.owner.email if v.owner else "",
+            "owner_username": v.owner.username if v.owner else "",
+        }
+
     def find_all_active_with_owner(self) -> list[dict]:
         """Получить все активные авто с информацией о владельце для уведомлений."""
         from sqlalchemy.orm import joinedload
@@ -168,23 +189,18 @@ class VehicleRepository:
             joinedload(VehicleDB.model_ref),
         ).filter(VehicleDB.is_active).all()
 
-        result = []
-        for v in db_vehicles:
-            intervals: dict[str, int] = {}
-            notify_flags: dict[str, bool] = {}
-            for cfg in COMPONENTS_CONFIG:
-                intervals[cfg.type.value] = getattr(v, cfg.interval_field) or cfg.default_interval
-                notify_flags[cfg.type.value] = getattr(v, cfg.notify_field)
-            notify_flags['tire_change'] = bool(getattr(v, 'tire_notify_enabled', True))
-            result.append({
-                "id": v.id,
-                "brand": v.brand_ref.name,
-                "model": v.model_ref.name,
-                "plate_number": v.plate_number,
-                "current_km": v.current_km,
-                "intervals": intervals,
-                "notify_flags": notify_flags,
-                "owner_email": v.owner.email if v.owner else "",
-                "owner_username": v.owner.username if v.owner else "",
-            })
-        return result
+        return [self._to_owner_dict(v) for v in db_vehicles]
+
+    def find_active_with_owner_by_id(self, vehicle_id: int) -> dict | None:
+        """Получить активное авто по id с информацией о владельце для уведомлений."""
+        from sqlalchemy.orm import joinedload
+        db_vehicle = self.db.query(VehicleDB).options(
+            joinedload(VehicleDB.owner),
+            joinedload(VehicleDB.brand_ref),
+            joinedload(VehicleDB.model_ref),
+        ).filter(
+            VehicleDB.id == vehicle_id,
+            VehicleDB.is_active,
+        ).first()
+
+        return self._to_owner_dict(db_vehicle) if db_vehicle else None
