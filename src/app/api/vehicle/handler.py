@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import HTTPException, status, Depends, BackgroundTasks
+from fastapi import HTTPException, status, Depends, BackgroundTasks, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -100,6 +100,8 @@ class VehicleHandler:
     async def get_vehicles(
         self,
         include_archived: bool = False,
+        limit: int | None = Query(None, ge=1, le=1000),
+        offset: int | None = Query(None, ge=0),
         db: Session = Depends(get_db),
         current_user: UserDB = Depends(get_current_user),
     ) -> list[VehicleResponse]:
@@ -111,6 +113,11 @@ class VehicleHandler:
             vehicles_dto = vehicle_service.get_all_vehicles_by_owner(current_user.id)
         else:
             vehicles_dto = vehicle_service.get_all_active_by_owner(current_user.id)
+
+        if offset is not None or limit is not None:
+            start = offset or 0
+            end = None if limit is None else start + limit
+            vehicles_dto = vehicles_dto[start:end]
 
         vehicle_ids = [v.id for v in vehicles_dto]
         replacements_by_vehicle = replacement_service.get_by_vehicles(vehicle_ids) if vehicle_ids else {}

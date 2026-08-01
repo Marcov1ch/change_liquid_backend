@@ -34,4 +34,3 @@ def test_calculate_status(
     assert result["km_remaining"] == exp_remaining
     assert result["status"] == exp_status
     assert result["next_replacement_km"] == _expected_next(km_at, interval)
-    assert "status_message" in result

@@ -3,14 +3,14 @@ from typing import Any, cast
 
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+import jwt
 from sqlalchemy.orm import Session
 import os
 
 from app.db.database import get_db
 from app.db.models import UserDB
 
-SECRET_KEY = os.getenv("SECRET_KEY")
+SECRET_KEY = cast(str, os.getenv("SECRET_KEY"))
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY environment variable is not set")
 ALGORITHM = "HS256"
@@ -45,7 +45,7 @@ def verify_token(token: str, token_type: str = "access") -> dict[str, Any]:
                 detail="Неверный тип токена",
             )
         return payload
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен",
@@ -64,7 +64,7 @@ def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Недействительный токен",
             )
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен",

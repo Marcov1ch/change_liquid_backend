@@ -1,15 +1,13 @@
 from datetime import date
 from typing import Final
 
+from app.common.constants import DATE_WARNING_DAYS
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.interval_utils import get_last_per_type
 from app.services.dto import VehicleDTO
 
-_OVERDUE: Final[int] = 50
-_CRITICAL: Final[int] = 250
-_WARNING: Final[int] = 500
-
-_DATE_WARNING_DAYS: Final[int] = 5
+_CRITICAL_KM: Final[int] = 250
+_WARNING_KM: Final[int] = 500
 
 
 class StatusCalculator:
@@ -25,7 +23,6 @@ class StatusCalculator:
                 "next_change_date": None,
                 "days_remaining": None,
                 "status": StatusEnum.UNKNOWN.value,
-                "status_message": "🟡 Дата не указана",
             }
 
         today = date.today()
@@ -33,19 +30,15 @@ class StatusCalculator:
 
         if days_remaining < 0:
             status = StatusEnum.OVERDUE.value
-            message = f"🔴 ПРОСРОЧЕНО на {-days_remaining} дн."
-        elif days_remaining <= _DATE_WARNING_DAYS:
+        elif days_remaining <= DATE_WARNING_DAYS:
             status = StatusEnum.WARNING.value
-            message = f"🟡 СКОРО! Осталось {days_remaining} дн."
         else:
             status = StatusEnum.GOOD.value
-            message = f"🟢 Замена через {days_remaining} дн."
 
         return {
             "next_change_date": next_change_date,
             "days_remaining": days_remaining,
             "status": status,
-            "status_message": message,
         }
 
     @staticmethod
@@ -60,25 +53,17 @@ class StatusCalculator:
 
         if km_remaining < 0:
             status = StatusEnum.OVERDUE.value
-            message = "🔴 ТРЕБУЕТСЯ НЕМЕДЛЕННАЯ ЗАМЕНА!"
-        elif km_remaining <= _OVERDUE:
+        elif km_remaining <= _CRITICAL_KM:
             status = StatusEnum.CRITICAL.value
-            message = f"🔴 СРОЧНО! Осталось {km_remaining} км"
-        elif km_remaining <= _CRITICAL:
-            status = StatusEnum.CRITICAL.value
-            message = f"🟠 КРИТИЧНО! Осталось {km_remaining} км"
-        elif km_remaining <= _WARNING:
+        elif km_remaining <= _WARNING_KM:
             status = StatusEnum.WARNING.value
-            message = f"🟡 СКОРО ЗАМЕНА! Осталось {km_remaining} км"
         else:
             status = StatusEnum.GOOD.value
-            message = f"🟢 В норме. Замена через {km_remaining} км"
 
         return {
             "next_replacement_km": next_km,
             "km_remaining": km_remaining,
             "status": status,
-            "status_message": message
         }
 
     @staticmethod

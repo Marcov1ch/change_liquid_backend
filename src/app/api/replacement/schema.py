@@ -67,10 +67,6 @@ class ReplacementResponse(ReplacementBase):
         ...,
         description='Статус замены',
     )
-    status_message: str = Field(
-        ...,
-        description='Сообщение статуса',
-    )
 
 
 class UpdateReplacementRequest(BaseModel):

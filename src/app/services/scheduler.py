@@ -3,6 +3,7 @@ from datetime import date
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from app.common.constants import DATE_WARNING_DAYS
 from app.common.enums import ComponentType
 from app.db.database import SessionLocal
 from app.repository.replacement_repository import ReplacementRepository
@@ -10,8 +11,6 @@ from app.repository.vehicle_repository import VehicleRepository
 from app.services.email_service import send_date_notification_email
 
 logger = logging.getLogger(__name__)
-
-DATE_WARNING_DAYS = 5
 
 scheduler = BackgroundScheduler()
 

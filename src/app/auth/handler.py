@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from jose import jwt
+import jwt
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 

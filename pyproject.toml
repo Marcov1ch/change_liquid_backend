@@ -9,7 +9,7 @@ fastapi = "^0.135.2"
 sqlalchemy = "^2.0.49"
 uvicorn = "^0.30.0"
 bcrypt = "^5.0.0"
-python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+pyjwt = "^2.10.1"
 email-validator = "^2.3.0"
 python-multipart = "^0.0.32"
 python-dotenv = "^1.0.0"

@@ -1,10 +1,14 @@
 import smtplib
 import ssl
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 from dataclasses import dataclass
 from html import escape
+
+_smtp_lock = threading.Lock()
+_smtp_server: smtplib.SMTP_SSL | None = None
 
 
 @dataclass
@@ -43,6 +47,30 @@ def _get_smtp_config() -> dict:
     }
 
 
+def _close_smtp() -> None:
+    """Закрыть и сбросить кэшированное SMTP-соединение."""
+    global _smtp_server
+    if _smtp_server is not None:
+        try:
+            _smtp_server.quit()
+        except Exception:
+            pass
+        _smtp_server = None
+
+
+def _get_smtp_connection(cfg: dict) -> smtplib.SMTP_SSL:
+    """Получить соединение с SMTP-сервером, переиспользуя открытое."""
+    global _smtp_server
+    if _smtp_server is not None:
+        return _smtp_server
+
+    context = ssl.create_default_context()
+    server = smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context)
+    server.login(cfg["user"], cfg["password"])
+    _smtp_server = server
+    return server
+
+
 def _send_email(to_email: str, subject: str, body: str) -> None:
     cfg = _get_smtp_config()
     msg = MIMEMultipart("alternative")
@@ -51,10 +79,15 @@ def _send_email(to_email: str, subject: str, body: str) -> None:
     msg["To"] = to_email
     msg.attach(MIMEText(body, "html", "utf-8"))
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(cfg["host"], cfg["port"], context=context) as server:
-        server.login(cfg["user"], cfg["password"])
-        server.sendmail(cfg["from"], to_email, msg.as_string())
+    message = msg.as_string()
+    with _smtp_lock:
+        try:
+            server = _get_smtp_connection(cfg)
+            server.sendmail(cfg["from"], to_email, message)
+        except (smtplib.SMTPException, OSError):
+            _close_smtp()
+            server = _get_smtp_connection(cfg)
+            server.sendmail(cfg["from"], to_email, message)
 
 
 def send_reset_password_email(to_email: str, token: str) -> None:

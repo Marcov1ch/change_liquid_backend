@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from fastapi import HTTPException, status, Depends, BackgroundTasks
+from fastapi import HTTPException, status, Depends, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 
 from app.api.replacement.schema import (
@@ -55,7 +55,6 @@ class ReplacementHandler:
                 next_change_date=replacement_dto.next_change_date,
                 days_remaining=None,
                 status=StatusEnum.REPLACED.value,
-                status_message="📌 Заменено",
             )
 
         if is_tire:
@@ -77,7 +76,6 @@ class ReplacementHandler:
                 next_change_date=status_data["next_change_date"],
                 days_remaining=status_data["days_remaining"],
                 status=status_data["status"],
-                status_message=status_data["status_message"],
             )
 
         interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
@@ -102,7 +100,6 @@ class ReplacementHandler:
             next_change_date=None,
             days_remaining=None,
             status=status_data["status"],
-            status_message=status_data["status_message"]
         )
 
     async def create_replacements(
@@ -151,6 +148,8 @@ class ReplacementHandler:
 
     async def get_vehicle_replacements(
         self,
+        limit: int | None = Query(None, ge=1, le=1000),
+        offset: int | None = Query(None, ge=0),
         db: Session = Depends(get_db),
         vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
     ) -> List[ReplacementResponse]:
@@ -167,6 +166,11 @@ class ReplacementHandler:
                 last = last_by_type.get(replacement.component_type)
                 is_latest = last is not None and (replacement.km_at_replacement, replacement.id or 0) == (last.km_at_replacement, last.id or 0)
                 result.append(self._to_response(replacement, vehicle, is_latest))
+
+            if offset is not None or limit is not None:
+                start = offset or 0
+                end = None if limit is None else start + limit
+                return result[start:end]
             return result
         except HTTPException:
             raise
