@@ -40,12 +40,12 @@ def verify_vehicle_access(
     if not vehicle:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vehicle not found",
+            detail="Автомобиль не найден",
         )
     if vehicle.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
     return vehicle
 
@@ -62,14 +62,14 @@ def verify_replacement_access(
     if not replacement:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Replacement not found",
+            detail="Замена не найдена",
         )
 
     vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
     if not vehicle or vehicle.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            detail="Доступ запрещён",
         )
 
     return replacement

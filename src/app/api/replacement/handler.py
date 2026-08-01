@@ -136,7 +136,7 @@ class ReplacementHandler:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to create replacements: {err}',
+                detail=f'Не удалось создать замены: {err}',
             )
 
     async def get_vehicle_replacements(
@@ -163,7 +163,7 @@ class ReplacementHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to get replacements: {err}',
+                detail=f'Не удалось получить замены: {err}',
             )
 
     async def get_replacement(
@@ -182,7 +182,7 @@ class ReplacementHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to get replacement: {err}',
+                detail=f'Не удалось получить замену: {err}',
             )
 
     async def update_replacement(
@@ -218,7 +218,7 @@ class ReplacementHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to update replacement: {err}',
+                detail=f'Не удалось обновить замену: {err}',
             )
 
     async def delete_replacement(
@@ -232,13 +232,13 @@ class ReplacementHandler:
         try:
             replacement_service.delete(replacement.id)
 
-            return {'status': 'ok', 'message': f'Replacement {replacement.id} has been deleted'}
+            return {'status': 'ok', 'message': f'Замена {replacement.id} удалена'}
         except HTTPException:
             raise
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to delete replacement: {err}',
+                detail=f'Не удалось удалить замену: {err}',
             )
 
 

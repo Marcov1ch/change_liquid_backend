@@ -21,12 +21,12 @@ class VehicleService:
         """Создать авто."""
         brand = self.enum_repo.get_brand_by_name(vehicle_data.brand)
         if not brand:
-            raise ValueError(f'Brand "{vehicle_data.brand}" not found')
+            raise ValueError(f'Марка "{vehicle_data.brand}" не найдена')
 
         models = self.enum_repo.get_models_by_brand(vehicle_data.brand)
         model = next((m for m in models if m.name == vehicle_data.model), None)
         if not model:
-            raise ValueError(f'Model "{vehicle_data.model}" not found for brand "{vehicle_data.brand}"')
+            raise ValueError(f'Модель "{vehicle_data.model}" не найдена для марки "{vehicle_data.brand}"')
 
         intervals = {}
         notify_flags = {}
@@ -106,7 +106,7 @@ class VehicleService:
         if brand is not None:
             brand_obj = self.enum_repo.get_brand_by_name(brand)
             if not brand_obj:
-                raise ValueError(f'Brand "{brand}" not found')
+                raise ValueError(f'Марка "{brand}" не найдена')
             dto.brand = brand
             dto.brand_id = brand_obj.id
 
@@ -115,7 +115,7 @@ class VehicleService:
             model_obj = next((m for m in models if m.name == model), None)
             if not model_obj:
                 raise ValueError(
-                    f'Model "{model}" not found for brand "{current_brand}"'
+                    f'Модель "{model}" не найдена для марки "{current_brand}"'
                 )
             dto.model = model
             dto.model_id = model_obj.id

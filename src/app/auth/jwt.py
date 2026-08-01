@@ -42,13 +42,13 @@ def verify_token(token: str, token_type: str = "access") -> dict[str, Any]:
         if payload.get("type") != token_type:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type",
+                detail="Неверный тип токена",
             )
         return payload
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
+            detail="Недействительный токен",
         )
 
 
@@ -62,19 +62,19 @@ def get_current_user(
         if username is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
+                detail="Недействительный токен",
             )
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
+            detail="Недействительный токен",
         )
 
     user = db.query(UserDB).filter(UserDB.username == username).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Пользователь не найден",
         )
 
     return user
@@ -88,7 +88,7 @@ def refresh_access_token(refresh_token: str) -> dict[str, str]:
         if not username:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
+                detail="Недействительный токен",
             )
 
         new_access = create_access_token(data={"sub": username})
@@ -103,5 +103,5 @@ def refresh_access_token(refresh_token: str) -> dict[str, str]:
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
+            detail="Недействительный refresh-токен",
         )

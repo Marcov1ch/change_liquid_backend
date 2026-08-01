@@ -151,7 +151,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to create vehicle: {err}',
+                detail=f'Не удалось создать автомобиль: {err}',
             )
 
     async def update_vehicle(
@@ -211,7 +211,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to update vehicle: {err}',
+                detail=f'Не удалось обновить автомобиль: {err}',
             )
 
     async def update_vehicle_km(
@@ -242,7 +242,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to update km: {err}'
+                detail=f'Не удалось обновить пробег: {err}'
             )
 
     async def update_vehicle_intervals(
@@ -262,7 +262,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to update intervals: {err}',
+                detail=f'Не удалось обновить интервалы: {err}',
             )
 
     async def update_notify(
@@ -282,7 +282,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to update notify settings: {err}',
+                detail=f'Не удалось обновить настройки уведомлений: {err}',
             )
 
     async def delete_vehicle(
@@ -303,7 +303,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to delete vehicle: {err}',
+                detail=f'Не удалось удалить автомобиль: {err}',
             )
 
     async def hard_delete_vehicle(
@@ -322,7 +322,7 @@ class VehicleHandler:
 
             return {
                 'status': 'ok',
-                'message': f'Vehicle {vehicle.id} and all its replacements have been permanently deleted',
+                'message': f'Автомобиль {vehicle.id} и все его замены полностью удалены',
             }
         except HTTPException:
             db.rollback()
@@ -331,7 +331,7 @@ class VehicleHandler:
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to hard delete vehicle: {err}',
+                detail=f'Не удалось полностью удалить автомобиль: {err}',
             )
 
     async def restore_vehicle(
@@ -345,7 +345,7 @@ class VehicleHandler:
             if vehicle.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail='Vehicle is already active',
+                    detail='Автомобиль уже активен',
                 )
             vehicle.is_active = True
             updated_dto = vehicle_service.update(vehicle)
@@ -355,7 +355,7 @@ class VehicleHandler:
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Failed to restore vehicle: {err}',
+                detail=f'Не удалось восстановить автомобиль: {err}',
             )
 
 

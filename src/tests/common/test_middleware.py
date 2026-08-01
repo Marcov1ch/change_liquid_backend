@@ -73,7 +73,7 @@ class TestVerifyVehicleAccess:
                 )
 
         assert exc.value.status_code == 404
-        assert 'not found' in exc.value.detail.lower()
+        assert exc.value.detail == 'Автомобиль не найден'
 
     def test_raises_403_when_owner_does_not_match(
         self, vehicle_dto: VehicleDTO,
@@ -91,7 +91,7 @@ class TestVerifyVehicleAccess:
                 )
 
         assert exc.value.status_code == 403
-        assert 'denied' in exc.value.detail.lower()
+        assert exc.value.detail == 'Доступ запрещён'
 
 
 class TestVerifyReplacementAccess:
@@ -133,7 +133,7 @@ class TestVerifyReplacementAccess:
                 )
 
         assert exc.value.status_code == 404
-        assert 'replacement' in exc.value.detail.lower()
+        assert exc.value.detail == 'Замена не найдена'
 
     def test_raises_403_when_vehicle_owner_does_not_match(
         self, replacement_dto: ReplacementDTO, vehicle_dto: VehicleDTO,
@@ -155,7 +155,7 @@ class TestVerifyReplacementAccess:
                 )
 
         assert exc.value.status_code == 403
-        assert 'denied' in exc.value.detail.lower()
+        assert exc.value.detail == 'Доступ запрещён'
 
     def test_raises_403_when_vehicle_not_found(
         self, replacement_dto: ReplacementDTO,
@@ -177,7 +177,7 @@ class TestVerifyReplacementAccess:
                 )
 
         assert exc.value.status_code == 403
-        assert 'denied' in exc.value.detail.lower()
+        assert exc.value.detail == 'Доступ запрещён'
 
 
 class TestLoggingMiddleware:

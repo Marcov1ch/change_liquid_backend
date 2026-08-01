@@ -71,7 +71,7 @@ async def register(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already exists"
+            detail="Имя пользователя или email уже заняты"
         )
 
     hashed = hash_password(user_data.password)
@@ -107,7 +107,7 @@ async def login(
     if not check_rate_limit(username):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many login attempts. Try again later."
+            detail="Слишком много попыток входа. Попробуйте позже."
         )
 
     user = db.query(UserDB).filter(UserDB.username == username).first()
@@ -116,7 +116,7 @@ async def login(
         add_failed_attempt(username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password"
+            detail="Неверное имя пользователя или пароль"
         )
 
     if not user.is_active:
@@ -150,7 +150,7 @@ async def refresh(request: RefreshRequest) -> RefreshTokenResponse:
     except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to refresh token: {err}",
+            detail=f"Не удалось обновить токен: {err}",
         )
 
 
@@ -181,7 +181,7 @@ async def update_email(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already in use"
+            detail="Email уже используется"
         )
 
     current_user.email = request.email
@@ -207,19 +207,19 @@ async def change_password(
     if not verify_password(request.old_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect password"
+            detail="Неверный пароль"
         )
 
     if request.old_password == request.new_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be different from the old one"
+            detail="Новый пароль должен отличаться от старого"
         )
 
     current_user.hashed_password = hash_password(request.new_password)
     db.commit()
 
-    return MessageResponse(detail="Password changed successfully")
+    return MessageResponse(detail="Пароль успешно изменён")
 
 
 @router.delete("/me", response_model=MessageResponse)
@@ -231,7 +231,7 @@ async def delete_account(
     current_user.is_active = False
     db.commit()
 
-    return MessageResponse(detail="Account deactivated")
+    return MessageResponse(detail="Аккаунт деактивирован")
 
 
 @router.post("/forgot-password", response_model=MessageResponse)

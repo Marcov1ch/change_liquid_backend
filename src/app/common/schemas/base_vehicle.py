@@ -19,7 +19,7 @@ def normalize_plate_number(value: str) -> str:
     if not any(re.match(p, cleaned) for p in patterns):
         raise ValueError(
             'Некорректный формат госномера. '
-            'Допустимые форматы: А123АА178 (РФ) или 1234AB7 (РБ)'
+            'Допустимые форматы: А123АА178 (РФ) или 1234АВ7 (РБ)'
         )
 
     return cleaned
