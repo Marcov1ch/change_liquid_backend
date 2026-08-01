@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.common.schemas.base_vehicle import VehicleBase, normalize_plate_number
@@ -60,7 +62,7 @@ class UpdateVehicleData(BaseModel):
     brand: str | None = None
     model: str | None = None
     plate_number: str | None = None
-    year: int | None = Field(None, ge=1960, le=2026)
+    year: int | None = Field(None, ge=1960)
     current_km: int | None = Field(None, ge=0)
     intervals: dict[str, int] | None = Field(
         None,
@@ -77,6 +79,15 @@ class UpdateVehicleData(BaseModel):
         if v is None:
             return v
         return normalize_plate_number(v)  # type: ignore[no-any-return]
+
+    @field_validator('year')
+    @classmethod
+    def validate_year(cls, v: int | None) -> int | None:
+        if v is not None and v > date.today().year + 1:
+            raise ValueError(
+                f'Год выпуска не может быть позже {date.today().year + 1}'
+            )
+        return v
 
 
 class VehicleUpdateIntervals(BaseModel):

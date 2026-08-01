@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status, Depends, BackgroundTasks
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.vehicle.schema import (
@@ -166,6 +167,12 @@ class VehicleHandler:
             if request.brand is not None or request.model is not None:
                 vehicle_service.update_brand_model(existing_dto, request.brand, request.model)
             if request.plate_number is not None:
+                existing = vehicle_service.get_by_plate_number(request.plate_number)
+                if existing and existing.id != vehicle.id:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=ERROR_MESSAGES['plate_number_exists'].format(plate_number=request.plate_number),
+                    )
                 existing_dto.plate_number = request.plate_number
             if request.year is not None:
                 existing_dto.year = request.year
@@ -193,6 +200,12 @@ class VehicleHandler:
             )
         except HTTPException:
             raise
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=ERROR_MESSAGES['plate_number_exists'].format(plate_number=request.plate_number),
+            )
         except Exception as err:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

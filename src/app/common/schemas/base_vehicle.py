@@ -1,4 +1,5 @@
 import re
+from datetime import date
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -48,7 +49,6 @@ class VehicleBase(BaseModel):
         description='Год выпуска автомобиля',
         examples=[2003],
         ge=1960,
-        le=2026,
     )
     current_km: int = Field(
         ...,
@@ -62,3 +62,13 @@ class VehicleBase(BaseModel):
     def validate_plate_number(cls, v: str) -> str:
         """Проверка формата госномера (РФ или РБ)."""
         return normalize_plate_number(v)
+
+    @field_validator('year')
+    @classmethod
+    def validate_year(cls, v: int) -> int:
+        """Проверка, что год выпуска не позже следующего года."""
+        if v > date.today().year + 1:
+            raise ValueError(
+                f'Год выпуска не может быть позже {date.today().year + 1}'
+            )
+        return v
