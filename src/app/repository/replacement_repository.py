@@ -25,7 +25,7 @@ class ReplacementRepository:
             result_dict['component_type'] = ComponentType(result_dict['component_type'])
         return Replacement(**result_dict)
 
-    def save(self, replacement: Replacement) -> Replacement:
+    def save(self, replacement: Replacement, commit: bool = True) -> Replacement:
         """Создать или обновить запись о замене."""
         if replacement.id:
             db_replacement = self.db.query(ReplacementDB).filter(
@@ -46,7 +46,10 @@ class ReplacementRepository:
             db_replacement = ReplacementDB(**replacement_data)
             self.db.add(db_replacement)
 
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         self.db.refresh(db_replacement)
 
         return self._to_replacement(db_replacement)
@@ -298,12 +301,13 @@ class ReplacementRepository:
             return True
         return False
 
-    def delete_by_vehicle_id(self, vehicle_id: int) -> int:
+    def delete_by_vehicle_id(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все замены для автомобиля. Возвращает количество удалённых."""
         count = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id
         ).delete()
-        self.db.commit()
+        if commit:
+            self.db.commit()
         return count  # type: ignore[no-any-return]
 
     def get_all(self) -> List[Replacement]:

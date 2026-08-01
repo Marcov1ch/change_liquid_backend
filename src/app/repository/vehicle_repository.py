@@ -45,7 +45,7 @@ class VehicleRepository:
         if tire_notify is not None:
             db_vehicle.tire_notify_enabled = tire_notify
 
-    def save(self, dto: VehicleDTO) -> VehicleDTO:
+    def save(self, dto: VehicleDTO, commit: bool = True) -> VehicleDTO:
         """Создать или обновить запись об автомобиле."""
         if dto.id:
             db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == dto.id).first()
@@ -73,7 +73,10 @@ class VehicleRepository:
             self._apply_intervals(db_vehicle, dto)
             self.db.add(db_vehicle)
 
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         self.db.refresh(db_vehicle)
 
         return self._to_dto(db_vehicle)
@@ -131,12 +134,13 @@ class VehicleRepository:
             return True
         return False
 
-    def hard_delete(self, vehicle_id: int) -> bool:
+    def hard_delete(self, vehicle_id: int, commit: bool = True) -> bool:
         """Полное удаление авто из БД."""
         db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
         if db_vehicle:
             self.db.delete(db_vehicle)
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return True
         return False
 

@@ -22,6 +22,7 @@ class ReplacementService:
         vehicle_id: int,
         request: ReplacementCreateRequest,
         vehicle_dto: VehicleDTO | None = None,
+        commit: bool = True,
     ) -> ReplacementDTO:
         """Создать запись о замене компонента."""
         if vehicle_dto is None:
@@ -51,6 +52,7 @@ class ReplacementService:
             self._update_vehicle_km_if_needed(
                 vehicle_dto,
                 request.km_at_replacement,
+                commit,
             )
 
         interval_km = (0 if is_tire
@@ -69,7 +71,7 @@ class ReplacementService:
             next_change_date=request.next_change_date,
         )
 
-        saved = self.repository.save(replacement)
+        saved = self.repository.save(replacement, commit=commit)
         return self._to_dto(saved)
 
     def get_by_id(
@@ -168,9 +170,9 @@ class ReplacementService:
         """Удалить запись о замене."""
         return bool(self.repository.delete(replacement_id))
 
-    def delete_by_vehicle(self, vehicle_id: int) -> int:
+    def delete_by_vehicle(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все замены для автомобиля."""
-        return self.repository.delete_by_vehicle_id(vehicle_id)  # type: ignore[no-any-return]
+        return self.repository.delete_by_vehicle_id(vehicle_id, commit)  # type: ignore[no-any-return]
 
     def _to_dto(self, replacement: Replacement) -> ReplacementDTO:
         """Преобразовать модель в DTO."""
@@ -256,8 +258,9 @@ class ReplacementService:
         self,
         vehicle_dto: VehicleDTO,
         new_km: int,
+        commit: bool = True,
     ) -> None:
         """Обновить пробег автомобиля, если новый пробег больше текущего."""
         if new_km > vehicle_dto.current_km:
             vehicle_dto.current_km = new_km
-            self.vehicle_repository.save(vehicle_dto)
+            self.vehicle_repository.save(vehicle_dto, commit=commit)

@@ -108,19 +108,28 @@ class ReplacementHandler:
         try:
             results = []
             for replacement_request in request.replacements:
-                replacement_dto = replacement_service.create(vehicle.id, replacement_request, vehicle)
+                replacement_dto = replacement_service.create(
+                    vehicle.id,
+                    replacement_request,
+                    vehicle,
+                    commit=False,
+                )
                 results.append(self._to_response(replacement_dto, vehicle))
 
+            db.commit()
             check_vehicle_notifications(db, vehicle.id)
             return results
         except ValueError as err:
+            db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(err),
             )
         except HTTPException:
+            db.rollback()
             raise
         except Exception as err:
+            db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'Failed to create replacements: {err}',

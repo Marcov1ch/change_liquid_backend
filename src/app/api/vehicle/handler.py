@@ -293,16 +293,19 @@ class VehicleHandler:
         replacement_service = ReplacementService(db)
 
         try:
-            replacement_service.delete_by_vehicle(vehicle.id)
-            vehicle_service.hard_delete(vehicle.id)
+            replacement_service.delete_by_vehicle(vehicle.id, commit=False)
+            vehicle_service.hard_delete(vehicle.id, commit=False)
+            db.commit()
 
             return {
                 'status': 'ok',
                 'message': f'Vehicle {vehicle.id} and all its replacements have been permanently deleted',
             }
         except HTTPException:
+            db.rollback()
             raise
         except Exception as err:
+            db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f'Failed to hard delete vehicle: {err}',

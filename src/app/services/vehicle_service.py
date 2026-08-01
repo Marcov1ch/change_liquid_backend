@@ -126,9 +126,9 @@ class VehicleService:
         """Удалить автомобиль."""
         return bool(self.repository.delete(vehicle_id))
 
-    def hard_delete(self, vehicle_id: int) -> bool:
+    def hard_delete(self, vehicle_id: int, commit: bool = True) -> bool:
         """Полностью удалить автомобиль из БД."""
-        return self.repository.hard_delete(vehicle_id)  # type: ignore[no-any-return]
+        return self.repository.hard_delete(vehicle_id, commit)  # type: ignore[no-any-return]
 
     def get_all_active_by_owner(self, user_id: int) -> list[VehicleDTO]:
         """Получить активные авто только для пользователя."""
