@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
 
 
@@ -7,6 +7,13 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
+
+    @field_validator('username')
+    @classmethod
+    def validate_no_control_chars(cls, v: str) -> str:
+        if any(ord(ch) < 32 for ch in v):
+            raise ValueError('Имя пользователя не может содержать управляющие символы')
+        return v
 
 
 class UserResponse(BaseModel):

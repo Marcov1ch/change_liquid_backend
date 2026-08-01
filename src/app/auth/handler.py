@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
@@ -35,6 +36,8 @@ from app.auth.jwt import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+logger = logging.getLogger(__name__)
 
 failed_attempts: defaultdict[str, list[datetime]] = defaultdict(list)
 
@@ -147,10 +150,11 @@ async def refresh(request: RefreshRequest) -> RefreshTokenResponse:
         )
     except HTTPException:
         raise
-    except Exception as err:
+    except Exception:
+        logger.exception('Failed to refresh tokens')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Не удалось обновить токен: {err}",
+            detail="Не удалось обновить токен",
         )
 
 

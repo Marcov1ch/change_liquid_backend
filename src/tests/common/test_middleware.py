@@ -1,6 +1,7 @@
 import logging
 from unittest.mock import MagicMock, patch
 from datetime import date
+import dataclasses
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -10,7 +11,9 @@ from app.common.enums import ComponentType
 from app.common.middleware import (
     LoggingMiddleware,
     verify_vehicle_access,
+    verify_vehicle_view_access,
     verify_replacement_access,
+    verify_replacement_view_access,
 )
 from app.services.dto import VehicleDTO, ReplacementDTO
 
@@ -92,6 +95,47 @@ class TestVerifyVehicleAccess:
 
         assert exc.value.status_code == 403
         assert exc.value.detail == 'Доступ запрещён'
+
+
+class TestVerifyVehicleAccessArchived:
+
+    def _archived(self, vehicle_dto: VehicleDTO) -> VehicleDTO:
+        return dataclasses.replace(vehicle_dto, is_active=False)
+
+    def test_raises_409_when_vehicle_archived(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with patch('app.common.middleware.VehicleService') as mock_service:
+            mock_service.return_value.get_by_id.return_value = self._archived(vehicle_dto)
+
+            with pytest.raises(HTTPException) as exc:
+                verify_vehicle_access(
+                    vehicle_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 409
+        assert exc.value.detail == 'Автомобиль находится в архиве'
+
+    def test_view_allows_archived_vehicle(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        archived = self._archived(vehicle_dto)
+
+        with patch('app.common.middleware.VehicleService') as mock_service:
+            mock_service.return_value.get_by_id.return_value = archived
+
+            result = verify_vehicle_view_access(
+                vehicle_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is archived
 
 
 class TestVerifyReplacementAccess:
@@ -178,6 +222,58 @@ class TestVerifyReplacementAccess:
 
         assert exc.value.status_code == 403
         assert exc.value.detail == 'Доступ запрещён'
+
+
+class TestVerifyReplacementAccessArchived:
+
+    def _with_archived_vehicle(self, vehicle_dto: VehicleDTO) -> VehicleDTO:
+        return dataclasses.replace(vehicle_dto, is_active=False)
+
+    def test_raises_409_when_vehicle_archived(
+        self, replacement_dto: ReplacementDTO, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with (
+            patch('app.common.middleware.ReplacementService') as mock_rep_service,
+            patch('app.common.middleware.VehicleService') as mock_veh_service,
+        ):
+            mock_rep_service.return_value.get_by_id.return_value = replacement_dto
+            mock_veh_service.return_value.get_by_id.return_value = (
+                self._with_archived_vehicle(vehicle_dto)
+            )
+
+            with pytest.raises(HTTPException) as exc:
+                verify_replacement_access(
+                    replacement_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 409
+        assert exc.value.detail == 'Автомобиль находится в архиве'
+
+    def test_view_allows_replacement_of_archived_vehicle(
+        self, replacement_dto: ReplacementDTO, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with (
+            patch('app.common.middleware.ReplacementService') as mock_rep_service,
+            patch('app.common.middleware.VehicleService') as mock_veh_service,
+        ):
+            mock_rep_service.return_value.get_by_id.return_value = replacement_dto
+            mock_veh_service.return_value.get_by_id.return_value = (
+                self._with_archived_vehicle(vehicle_dto)
+            )
+
+            result = verify_replacement_view_access(
+                replacement_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is replacement_dto
 
 
 class TestLoggingMiddleware:

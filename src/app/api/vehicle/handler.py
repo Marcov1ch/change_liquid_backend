@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import HTTPException, status, Depends, BackgroundTasks
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,7 +14,7 @@ from app.api.vehicle.schema import (
 )
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
-from app.common.middleware import verify_vehicle_access
+from app.common.middleware import verify_vehicle_access, verify_vehicle_view_access
 from app.db.database import get_db
 from app.db.models import UserDB
 from app.auth.jwt import get_current_user
@@ -23,6 +25,8 @@ from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import get_last_per_type
 from app.services.notification_service import check_vehicle_notifications_background
 
+
+logger = logging.getLogger(__name__)
 
 _MSG_PLATE_NUMBER_EXISTS = 'Автомобиль с госномером {plate_number} уже существует'
 
@@ -119,7 +123,7 @@ class VehicleHandler:
     async def get_vehicle(
         self,
         db: Session = Depends(get_db),
-        vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
     ) -> VehicleResponse:
         """Получить автомобиль по ID."""
         replacement_service = ReplacementService(db)
@@ -146,12 +150,18 @@ class VehicleHandler:
             vehicle_dto = vehicle_service.create(current_user.id, request)
 
             return self._to_response(vehicle_dto)
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(err),
+            )
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to create vehicle')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось создать автомобиль: {err}',
+                detail='Не удалось создать автомобиль',
             )
 
     async def update_vehicle(
@@ -208,10 +218,11 @@ class VehicleHandler:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
             )
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to update vehicle')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось обновить автомобиль: {err}',
+                detail='Не удалось обновить автомобиль',
             )
 
     async def update_vehicle_km(
@@ -239,10 +250,11 @@ class VehicleHandler:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to update vehicle km')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось обновить пробег: {err}'
+                detail='Не удалось обновить пробег'
             )
 
     async def update_vehicle_intervals(
@@ -259,10 +271,11 @@ class VehicleHandler:
 
             updated_dto = vehicle_service.update(vehicle)
             return self._to_response(updated_dto)
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to update vehicle intervals')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось обновить интервалы: {err}',
+                detail='Не удалось обновить интервалы',
             )
 
     async def update_notify(
@@ -279,10 +292,11 @@ class VehicleHandler:
 
             updated_dto = vehicle_service.update(vehicle)
             return self._to_response(updated_dto)
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to update vehicle notify settings')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось обновить настройки уведомлений: {err}',
+                detail='Не удалось обновить настройки уведомлений',
             )
 
     async def delete_vehicle(
@@ -300,16 +314,17 @@ class VehicleHandler:
             }
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to delete vehicle')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось удалить автомобиль: {err}',
+                detail='Не удалось удалить автомобиль',
             )
 
     async def hard_delete_vehicle(
         self,
         db: Session = Depends(get_db),
-        vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
     ) -> dict[str, str]:
         """Полное удаление авто из БД."""
         vehicle_service = VehicleService(db)
@@ -327,17 +342,18 @@ class VehicleHandler:
         except HTTPException:
             db.rollback()
             raise
-        except Exception as err:
+        except Exception:
             db.rollback()
+            logger.exception('Failed to hard delete vehicle')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось полностью удалить автомобиль: {err}',
+                detail='Не удалось полностью удалить автомобиль',
             )
 
     async def restore_vehicle(
         self,
         db: Session = Depends(get_db),
-        vehicle: VehicleDTO = Depends(verify_vehicle_access),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
     ) -> VehicleResponse:
         """Восстановить авто из архива."""
         vehicle_service = VehicleService(db)
@@ -352,10 +368,11 @@ class VehicleHandler:
             return self._to_response(updated_dto)
         except HTTPException:
             raise
-        except Exception as err:
+        except Exception:
+            logger.exception('Failed to restore vehicle')
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Не удалось восстановить автомобиль: {err}',
+                detail='Не удалось восстановить автомобиль',
             )
 
 
