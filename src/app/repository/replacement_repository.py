@@ -72,13 +72,59 @@ class ReplacementRepository:
 
         return [self._to_replacement(replacement) for replacement in db_replacements]
 
-    def find_by_vehicle_id(self, vehicle_id: int) -> List[Replacement]:
-        """Найти все замены для автомобиля."""
-        db_replacements = self.db.query(ReplacementDB).filter(
+    def find_by_vehicle_id(
+        self,
+        vehicle_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> List[Replacement]:
+        """Найти замены для автомобиля (с опциональной пагинацией)."""
+        query = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id
-        ).all()
+        ).order_by(ReplacementDB.id.asc())
 
+        if offset is not None:
+            query = query.offset(offset)
+        if limit is not None:
+            query = query.limit(limit)
+
+        db_replacements = query.all()
         return [self._to_replacement(replacement) for replacement in db_replacements]
+
+    def get_latest_replacement_ids(self, vehicle_id: int) -> set[int]:
+        """Вернуть id последней замены по каждому типу компонента (max км, при равных — max id)."""
+        from sqlalchemy import func, and_
+
+        subq = (
+            self.db.query(
+                ReplacementDB.component_type,
+                func.max(ReplacementDB.km_at_replacement).label('max_km'),
+            )
+            .filter(ReplacementDB.vehicle_id == vehicle_id)
+            .group_by(ReplacementDB.component_type)
+            .subquery()
+        )
+
+        rows = (
+            self.db.query(ReplacementDB)
+            .join(
+                subq,
+                and_(
+                    ReplacementDB.component_type == subq.c.component_type,
+                    ReplacementDB.km_at_replacement == subq.c.max_km,
+                ),
+            )
+            .filter(ReplacementDB.vehicle_id == vehicle_id)
+            .all()
+        )
+
+        best_by_type: dict[str, ReplacementDB] = {}
+        for replacement in rows:
+            key = replacement.component_type
+            if key not in best_by_type or replacement.id > best_by_type[key].id:
+                best_by_type[key] = replacement
+
+        return {r.id for r in best_by_type.values()}
 
     def find_by_vehicle_and_component(
             self,

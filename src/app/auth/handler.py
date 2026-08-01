@@ -61,6 +61,14 @@ def add_failed_attempt(username: str) -> None:
     failed_attempts[username].append(datetime.now(timezone.utc))
 
 
+def _send_reset_password_email_safe(to_email: str, token: str) -> None:
+    """Отправить письмо восстановления пароля, не роняя фоновую задачу."""
+    try:
+        send_reset_password_email(to_email=to_email, token=token)
+    except Exception:
+        logger.exception('Failed to send reset-password email to %s', to_email)
+
+
 @router.post("/register", response_model=UserResponse)
 async def register(
     user_data: UserCreate,
@@ -266,7 +274,7 @@ async def forgot_password(
     )
 
     background_tasks.add_task(
-        send_reset_password_email,
+        _send_reset_password_email_safe,
         to_email=user.email,
         token=reset_token,
     )

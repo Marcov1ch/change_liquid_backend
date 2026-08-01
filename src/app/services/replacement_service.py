@@ -93,9 +93,18 @@ class ReplacementService:
     def get_by_vehicle(
         self,
         vehicle_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> list[ReplacementDTO]:
-        """Получить все замены для авто."""
-        return [self._to_dto(r) for r in self.repository.find_by_vehicle_id(vehicle_id)]
+        """Получить замены для авто (с опциональной пагинацией)."""
+        return [
+            self._to_dto(r)
+            for r in self.repository.find_by_vehicle_id(vehicle_id, limit=limit, offset=offset)
+        ]
+
+    def get_latest_replacement_ids(self, vehicle_id: int) -> set[int]:
+        """Получить id последних замен по каждому типу компонента авто."""
+        return self.repository.get_latest_replacement_ids(vehicle_id)  # type: ignore[no-any-return]
 
     def get_by_vehicles(
         self,

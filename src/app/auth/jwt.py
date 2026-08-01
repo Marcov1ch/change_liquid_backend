@@ -56,15 +56,9 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> UserDB:
-    try:
-        payload = verify_token(token, "access")
-        username = payload.get("sub")
-        if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Недействительный токен",
-            )
-    except jwt.InvalidTokenError:
+    payload = verify_token(token, "access")
+    username = payload.get("sub")
+    if username is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Недействительный токен",

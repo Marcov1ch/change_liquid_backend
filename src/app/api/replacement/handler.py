@@ -21,7 +21,6 @@ from app.common.middleware import (
 )
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.calculator import StatusCalculator
-from app.common.utils.interval_utils import get_last_per_type
 from app.services.notification_service import check_vehicle_notifications_background
 
 logger = logging.getLogger(__name__)
@@ -157,21 +156,17 @@ class ReplacementHandler:
         replacement_service = ReplacementService(db)
 
         try:
-            replacements_dto = replacement_service.get_by_vehicle(vehicle.id)
+            latest_ids = replacement_service.get_latest_replacement_ids(vehicle.id)
+            replacements_dto = replacement_service.get_by_vehicle(
+                vehicle.id,
+                limit=limit,
+                offset=offset,
+            )
 
-            last_by_type = get_last_per_type(replacements_dto)
-
-            result = []
-            for replacement in replacements_dto:
-                last = last_by_type.get(replacement.component_type)
-                is_latest = last is not None and (replacement.km_at_replacement, replacement.id or 0) == (last.km_at_replacement, last.id or 0)
-                result.append(self._to_response(replacement, vehicle, is_latest))
-
-            if offset is not None or limit is not None:
-                start = offset or 0
-                end = None if limit is None else start + limit
-                return result[start:end]
-            return result
+            return [
+                self._to_response(replacement, vehicle, is_latest=replacement.id in latest_ids)
+                for replacement in replacements_dto
+            ]
         except HTTPException:
             raise
         except Exception:
