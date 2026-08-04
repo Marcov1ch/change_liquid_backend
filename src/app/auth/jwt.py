@@ -20,18 +20,18 @@ REFRESH_TOKEN_EXPIRE_DAYS = 14
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, version: int = 0) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({"exp": expire, "type": "access", "ver": version})
     token: str = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return token
 
 
-def create_refresh_token(data: dict) -> str:
+def create_refresh_token(data: dict, version: int = 0) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({"exp": expire, "type": "refresh", "ver": version})
     token: str = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return token
 
@@ -71,6 +71,12 @@ def get_current_user(
             detail="Пользователь не найден",
         )
 
+    if payload.get("ver") != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Сессия устарела, войдите снова",
+        )
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -80,7 +86,7 @@ def get_current_user(
     return user
 
 
-def refresh_access_token(refresh_token: str) -> dict[str, str]:
+def refresh_access_token(db: Session, refresh_token: str) -> dict[str, str]:
     """Обновить access и refresh токены."""
     try:
         payload = verify_token(refresh_token, "refresh")
@@ -91,8 +97,20 @@ def refresh_access_token(refresh_token: str) -> dict[str, str]:
                 detail="Недействительный токен",
             )
 
-        new_access = create_access_token(data={"sub": username})
-        new_refresh = create_refresh_token(data={"sub": username})
+        user = db.query(UserDB).filter(UserDB.username == username).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Пользователь не найден",
+            )
+        if payload.get("ver") != user.token_version:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Сессия устарела, войдите снова",
+            )
+
+        new_access = create_access_token(data={"sub": username}, version=user.token_version)
+        new_refresh = create_refresh_token(data={"sub": username}, version=user.token_version)
 
         return {
             "access_token": new_access,
