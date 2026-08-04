@@ -75,7 +75,7 @@ class TestRateLimit:
             current = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
             @classmethod
-            def now(cls, tz=None):  # type: ignore[override]
+            def now(cls, tz=None):
                 return cls.current
 
         monkeypatch.setattr(auth_handler, "datetime", FakeDatetime)
