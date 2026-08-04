@@ -1,8 +1,11 @@
-from sqlalchemy.orm import Session
-from app.db.models import ReplacementDB
-from app.common.models.replacement import Replacement
-from app.common.enums import ComponentType
+from dataclasses import asdict
 from typing import List, Optional
+
+from sqlalchemy.orm import Session
+
+from app.db.models import ReplacementDB
+from app.common.enums import ComponentType
+from app.services.dto import ReplacementDTO
 
 
 class ReplacementRepository:
@@ -12,20 +15,32 @@ class ReplacementRepository:
         self.db = db
 
     @staticmethod
-    def _to_replacement(db_row: ReplacementDB) -> Replacement:
-        """Конвертировать ORM-модель в доменную модель."""
-        result_dict = db_row.__dict__.copy()
-        result_dict.pop('_sa_instance_state', None)
-        result_dict.pop('warning_notified', None)
-        result_dict.pop('critical_notified', None)
-        result_dict.pop('overdue_notified_at_km', None)
-        result_dict.pop('date_warning_notified', None)
-        result_dict.pop('date_overdue_notified', None)
-        if result_dict.get('component_type'):
-            result_dict['component_type'] = ComponentType(result_dict['component_type'])
-        return Replacement(**result_dict)
+    def _to_dto(db_row: ReplacementDB) -> ReplacementDTO:
+        """Конвертировать ORM-модель в DTO."""
+        return ReplacementDTO(
+            id=db_row.id,
+            vehicle_id=db_row.vehicle_id,
+            component_type=ComponentType(db_row.component_type),
+            component_name=db_row.component_name,
+            component_price=db_row.component_price,
+            work_price=db_row.work_price,
+            replacement_date=db_row.replacement_date,
+            km_at_replacement=db_row.km_at_replacement,
+            interval_km=db_row.interval_km,
+            next_change_date=db_row.next_change_date,
+            interval_months=db_row.interval_months,
+        )
 
-    def save(self, replacement: Replacement, commit: bool = True) -> Replacement:
+    @staticmethod
+    def _to_orm_data(replacement: ReplacementDTO) -> dict:
+        """Преобразовать DTO в dict для ORM (component_type в строку)."""
+        data = asdict(replacement)
+        data.pop('id', None)
+        if data.get('component_type'):
+            data['component_type'] = data['component_type'].value
+        return data
+
+    def save(self, replacement: ReplacementDTO, commit: bool = True) -> ReplacementDTO:
         """Создать или обновить запись о замене."""
         if replacement.id:
             db_replacement = self.db.query(ReplacementDB).filter(
@@ -34,16 +49,10 @@ class ReplacementRepository:
             if not db_replacement:
                 raise ValueError(f'Replacement with id {replacement.id} not found')
 
-            update_data = replacement.model_dump(exclude={'id'})
-            if 'component_type' in update_data and update_data['component_type']:
-                update_data['component_type'] = update_data['component_type'].value
-            for key, value in update_data.items():
+            for key, value in self._to_orm_data(replacement).items():
                 setattr(db_replacement, key, value)
         else:
-            replacement_data = replacement.model_dump(exclude={'id'})
-            if replacement_data.get('component_type'):
-                replacement_data['component_type'] = replacement_data['component_type'].value
-            db_replacement = ReplacementDB(**replacement_data)
+            db_replacement = ReplacementDB(**self._to_orm_data(replacement))
             self.db.add(db_replacement)
 
         if commit:
@@ -52,9 +61,9 @@ class ReplacementRepository:
             self.db.flush()
         self.db.refresh(db_replacement)
 
-        return self._to_replacement(db_replacement)
+        return self._to_dto(db_replacement)
 
-    def find_by_id(self, replacement_id: int) -> Optional[Replacement]:
+    def find_by_id(self, replacement_id: int) -> Optional[ReplacementDTO]:
         """Найти замену по id."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.id == replacement_id
@@ -62,22 +71,22 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        return self._to_replacement(db_replacement)
+        return self._to_dto(db_replacement)
 
-    def find_by_vehicle_ids(self, vehicle_ids: list[int]) -> List[Replacement]:
+    def find_by_vehicle_ids(self, vehicle_ids: list[int]) -> List[ReplacementDTO]:
         """Найти все замены для списка автомобилей."""
         db_replacements = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id.in_(vehicle_ids)
         ).all()
 
-        return [self._to_replacement(replacement) for replacement in db_replacements]
+        return [self._to_dto(replacement) for replacement in db_replacements]
 
     def find_by_vehicle_id(
         self,
         vehicle_id: int,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> List[Replacement]:
+    ) -> List[ReplacementDTO]:
         """Найти замены для автомобиля (с опциональной пагинацией)."""
         query = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id
@@ -89,7 +98,7 @@ class ReplacementRepository:
             query = query.limit(limit)
 
         db_replacements = query.all()
-        return [self._to_replacement(replacement) for replacement in db_replacements]
+        return [self._to_dto(replacement) for replacement in db_replacements]
 
     def get_latest_replacement_ids(self, vehicle_id: int) -> set[int]:
         """Вернуть id последней замены по каждому типу компонента (max км, при равных — max id)."""
@@ -130,21 +139,21 @@ class ReplacementRepository:
             self,
             vehicle_id: int,
             component_type: ComponentType
-    ) -> List[Replacement]:
+    ) -> List[ReplacementDTO]:
         """Найти замены для автомобиля по типу компонента."""
         db_replacements = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
             ReplacementDB.component_type == component_type.value
         ).all()
 
-        return [self._to_replacement(replacement) for replacement in db_replacements]
+        return [self._to_dto(replacement) for replacement in db_replacements]
 
     def find_by_vehicle_component_and_km(
         self,
         vehicle_id: int,
         component_type: ComponentType,
         km: int,
-    ) -> Optional[Replacement]:
+    ) -> Optional[ReplacementDTO]:
         """Найти замену по автомобилю, типу компонента и пробегу."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
@@ -155,13 +164,13 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        return self._to_replacement(db_replacement)
+        return self._to_dto(db_replacement)
 
     def get_last_replacement(
             self,
             vehicle_id: int,
             component_type: ComponentType
-    ) -> Optional[Replacement]:
+    ) -> Optional[ReplacementDTO]:
         """Получить последнюю замену для компонента автомобиля."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
@@ -171,14 +180,14 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        return self._to_replacement(db_replacement)
+        return self._to_dto(db_replacement)
 
     def find_previous_replacement(
         self,
         vehicle_id: int,
         component_type: ComponentType,
         exclude_id: int,
-    ) -> Optional[Replacement]:
+    ) -> Optional[ReplacementDTO]:
         """Найти предыдущую замену для компонента, исключая указанный ID."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
@@ -189,7 +198,7 @@ class ReplacementRepository:
         if not db_replacement:
             return None
 
-        return self._to_replacement(db_replacement)
+        return self._to_dto(db_replacement)
 
     def find_neighbors(
         self,
@@ -197,7 +206,7 @@ class ReplacementRepository:
         component_type: ComponentType,
         km: int,
         exclude_id: int,
-    ) -> tuple[Optional[Replacement], Optional[Replacement]]:
+    ) -> tuple[Optional[ReplacementDTO], Optional[ReplacementDTO]]:
         """Найти предыдущую (max_km < km) и следующую (min_km > km) замену, исключая указанный ID."""
         base_filter = (
             ReplacementDB.vehicle_id == vehicle_id,
@@ -219,8 +228,8 @@ class ReplacementRepository:
         )
 
         return (
-            self._to_replacement(prev_row) if prev_row else None,
-            self._to_replacement(next_row) if next_row else None,
+            self._to_dto(prev_row) if prev_row else None,
+            self._to_dto(next_row) if next_row else None,
         )
 
     def get_last_replacement_with_notify(
@@ -356,8 +365,8 @@ class ReplacementRepository:
             self.db.commit()
         return count  # type: ignore[no-any-return]
 
-    def get_all(self) -> List[Replacement]:
+    def get_all(self) -> List[ReplacementDTO]:
         """Получить все замены."""
         db_replacements = self.db.query(ReplacementDB).all()
 
-        return [self._to_replacement(replacement) for replacement in db_replacements]
+        return [self._to_dto(replacement) for replacement in db_replacements]

@@ -4,8 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.common.enums import ComponentType
-from app.common.models.replacement import Replacement
-from app.services.dto import VehicleDTO
+from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 
 
@@ -38,13 +37,15 @@ def test_raises_on_duplicate(
     request.work_price = 0
     request.next_change_date = None
 
-    existing = Replacement(
+    existing = ReplacementDTO(
         id=1, vehicle_id=1,
         component_type=ComponentType.ENGINE_OIL,
         component_name='Mobil 1',
-        component_price=0, work_price=0,
+        component_price=0,
+        work_price=0,
         replacement_date=date(2024, 1, 1),
-        km_at_replacement=10000, interval_km=7000,
+        km_at_replacement=10000,
+        interval_km=7000,
     )
 
     service = ReplacementService.__new__(ReplacementService)
@@ -74,18 +75,22 @@ def test_no_error_on_different_km(
     request.interval_km = 7000
     request.next_change_date = None
 
-    existing = Replacement(
+    existing = ReplacementDTO(
         id=1, vehicle_id=1,
         component_type=ComponentType.ENGINE_OIL,
         component_name='Mobil 1',
-        component_price=0, work_price=0,
+        component_price=0,
+        work_price=0,
         replacement_date=date(2024, 1, 1),
-        km_at_replacement=10000, interval_km=7000,
+        km_at_replacement=10000,
+        interval_km=7000,
     )
 
     def _find_by_km(
-        vehicle_id: int, component_type: ComponentType, km: int,
-    ) -> Replacement | None:
+        vehicle_id: int,
+        component_type: ComponentType,
+        km: int,
+    ) -> ReplacementDTO | None:
         if km == 10000:
             return existing
         return None
@@ -94,13 +99,15 @@ def test_no_error_on_different_km(
     service.repository = MagicMock()
     service.repository.find_by_vehicle_component_and_km.side_effect = _find_by_km
     service.vehicle_repository = MagicMock()
-    saved = Replacement(
+    saved = ReplacementDTO(
         id=2, vehicle_id=1,
         component_type=ComponentType.ENGINE_OIL,
         component_name='Mobil 1',
-        component_price=0, work_price=0,
+        component_price=0,
+        work_price=0,
         replacement_date=date(2024, 6, 1),
-        km_at_replacement=15000, interval_km=7000,
+        km_at_replacement=15000,
+        interval_km=7000,
     )
     service.repository.save.return_value = saved
 

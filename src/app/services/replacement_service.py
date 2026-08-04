@@ -1,7 +1,6 @@
 from datetime import date
 from sqlalchemy.orm import Session
 from app.api.replacement.schema import ReplacementCreateRequest
-from app.common.models.replacement import Replacement
 from app.common.enums import ComponentType
 from app.common.utils.interval_utils import ComponentIntervalUtils
 from app.repository.replacement_repository import ReplacementRepository
@@ -66,7 +65,7 @@ class ReplacementService:
         interval_km = (0 if is_tire
                        else ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type))
 
-        replacement = Replacement(
+        replacement = ReplacementDTO(
             id=None,
             vehicle_id=vehicle_id,
             component_type=request.component_type,
@@ -79,16 +78,14 @@ class ReplacementService:
             next_change_date=request.next_change_date,
         )
 
-        saved = self.repository.save(replacement, commit=commit)
-        return self._to_dto(saved)
+        return self.repository.save(replacement, commit=commit)
 
     def get_by_id(
         self,
         replacement_id: int,
     ) -> ReplacementDTO | None:
         """Получить замену по id."""
-        replacement = self.repository.find_by_id(replacement_id)
-        return self._to_dto(replacement) if replacement else None
+        return self.repository.find_by_id(replacement_id)
 
     def get_by_vehicle(
         self,
@@ -97,10 +94,7 @@ class ReplacementService:
         offset: int | None = None,
     ) -> list[ReplacementDTO]:
         """Получить замены для авто (с опциональной пагинацией)."""
-        return [
-            self._to_dto(r)
-            for r in self.repository.find_by_vehicle_id(vehicle_id, limit=limit, offset=offset)
-        ]
+        return self.repository.find_by_vehicle_id(vehicle_id, limit=limit, offset=offset)  # type: ignore[no-any-return]
 
     def get_latest_replacement_ids(self, vehicle_id: int) -> set[int]:
         """Получить id последних замен по каждому типу компонента авто."""
@@ -114,7 +108,7 @@ class ReplacementService:
         replacements = self.repository.find_by_vehicle_ids(vehicle_ids)
         grouped: dict[int, list[ReplacementDTO]] = {}
         for r in replacements:
-            grouped.setdefault(r.vehicle_id, []).append(self._to_dto(r))
+            grouped.setdefault(r.vehicle_id, []).append(r)
         return grouped
 
     def get_by_vehicle_and_component(
@@ -123,7 +117,7 @@ class ReplacementService:
         component_type: ComponentType,
     ) -> list[ReplacementDTO]:
         """Получить замены для компонента автомобиля."""
-        return [self._to_dto(r) for r in self.repository.find_by_vehicle_and_component(vehicle_id, component_type)]
+        return self.repository.find_by_vehicle_and_component(vehicle_id, component_type)  # type: ignore[no-any-return]
 
     def get_last_for_vehicle_and_component(
         self,
@@ -131,8 +125,7 @@ class ReplacementService:
         component_type: ComponentType,
     ) -> ReplacementDTO | None:
         """Получить последнюю замену для компонента автомобиля."""
-        replacement = self.repository.get_last_replacement(vehicle_id, component_type)
-        return self._to_dto(replacement) if replacement else None
+        return self.repository.get_last_replacement(vehicle_id, component_type)
 
     def update(  # type: ignore[no-untyped-def]
         self,
@@ -181,7 +174,7 @@ class ReplacementService:
             self.vehicle_repository.save(vehicle_dto)
 
         updated = self.repository.save(replacement)
-        return self._to_dto(updated) if updated else None
+        return updated
 
     def delete(self, replacement_id: int) -> bool:
         """Удалить запись о замене."""
@@ -190,22 +183,6 @@ class ReplacementService:
     def delete_by_vehicle(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все замены для автомобиля."""
         return self.repository.delete_by_vehicle_id(vehicle_id, commit)  # type: ignore[no-any-return]
-
-    def _to_dto(self, replacement: Replacement) -> ReplacementDTO:
-        """Преобразовать модель в DTO."""
-        return ReplacementDTO(
-            id=replacement.id,
-            vehicle_id=replacement.vehicle_id,
-            component_type=replacement.component_type,
-            component_name=replacement.component_name,
-            component_price=replacement.component_price,
-            work_price=replacement.work_price,
-            replacement_date=replacement.replacement_date,
-            km_at_replacement=replacement.km_at_replacement,
-            interval_km=replacement.interval_km,
-            next_change_date=replacement.next_change_date,
-            interval_months=replacement.interval_months,
-        )
 
     def _validate_common(
         self,
