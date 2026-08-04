@@ -1,7 +1,8 @@
 import logging
+import time
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 import jwt
 from sqlalchemy.orm import Session
@@ -39,26 +40,57 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 logger = logging.getLogger(__name__)
 
+_RATE_LIMIT_ATTEMPTS = 3
+_RATE_LIMIT_WINDOW_SECONDS = 300
+_RATE_LIMIT_MAX_KEYS = 10000
+_RATE_LIMIT_CLEANUP_SECONDS = 60
+
 failed_attempts: defaultdict[str, list[datetime]] = defaultdict(list)
+_last_cleanup = time.monotonic()
 
 
-def check_rate_limit(username: str) -> bool:
-    """Проверяет, не превышен ли лимит попыток входа (3 попытки за 5 минут)."""
+def _client_ip(request: Request) -> str:
+    """Взять реальный IP клиента, учитывая X-Forwarded-For за прокси."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def _prune_stale() -> None:
+    """Периодически удалять ключи с пустыми списками попыток."""
+    global _last_cleanup
+    if time.monotonic() - _last_cleanup < _RATE_LIMIT_CLEANUP_SECONDS:
+        return
+    _last_cleanup = time.monotonic()
+    empty = [k for k, v in failed_attempts.items() if not v]
+    for k in empty:
+        del failed_attempts[k]
+
+
+def check_rate_limit(key: str) -> bool:
+    """Проверяет, не превышен ли лимит попыток входа (3 попытки за 5 минут на ip:username)."""
     now = datetime.now(timezone.utc)
-    failed_attempts[username] = [
-        t for t in failed_attempts[username]
-        if now - t < timedelta(minutes=5)
-    ]
+    cutoff = now - timedelta(seconds=_RATE_LIMIT_WINDOW_SECONDS)
+    failed_attempts[key] = [t for t in failed_attempts[key] if t >= cutoff]
 
-    if len(failed_attempts[username]) >= 3:
+    _prune_stale()
+
+    if len(failed_attempts[key]) >= _RATE_LIMIT_ATTEMPTS:
         return False
+
+    if len(failed_attempts) > _RATE_LIMIT_MAX_KEYS:
+        while len(failed_attempts) > _RATE_LIMIT_MAX_KEYS:
+            failed_attempts.pop(next(iter(failed_attempts)))
 
     return True
 
 
-def add_failed_attempt(username: str) -> None:
+def add_failed_attempt(key: str) -> None:
     """Добавляет неудачную попытку входа."""
-    failed_attempts[username].append(datetime.now(timezone.utc))
+    failed_attempts[key].append(datetime.now(timezone.utc))
 
 
 def _send_reset_password_email_safe(to_email: str, token: str) -> None:
@@ -109,13 +141,15 @@ async def register(
 
 @router.post("/login", response_model=Token)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ) -> Token:
     """Логин пользователя, возвращает JWT токен."""
     username = form_data.username
+    key = f"{_client_ip(request)}:{username}"
 
-    if not check_rate_limit(username):
+    if not check_rate_limit(key):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Слишком много попыток входа. Попробуйте позже."
@@ -124,7 +158,7 @@ async def login(
     user = db.query(UserDB).filter(UserDB.username == username).first()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
-        add_failed_attempt(username)
+        add_failed_attempt(key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверное имя пользователя или пароль"
@@ -134,7 +168,7 @@ async def login(
         user.is_active = True
         db.commit()
 
-    failed_attempts[username].clear()
+    failed_attempts.pop(key, None)
 
     access_token = create_access_token(data={"sub": user.username})
     refresh_token = create_refresh_token(data={"sub": user.username})
