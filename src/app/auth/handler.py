@@ -170,8 +170,8 @@ async def login(
 
     failed_attempts.pop(key, None)
 
-    access_token = create_access_token(data={"sub": user.username})
-    refresh_token = create_refresh_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user.username}, version=user.token_version)
+    refresh_token = create_refresh_token(data={"sub": user.username}, version=user.token_version)
 
     return Token(
         access_token=access_token,
@@ -181,10 +181,13 @@ async def login(
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
-async def refresh(request: RefreshRequest) -> RefreshTokenResponse:
+async def refresh(
+    request: RefreshRequest,
+    db: Session = Depends(get_db),
+) -> RefreshTokenResponse:
     """Обновить access и refresh токены (сброс срока до 14 дней)."""
     try:
-        tokens = refresh_access_token(request.refresh_token)
+        tokens = refresh_access_token(db, request.refresh_token)
         return RefreshTokenResponse(
             access_token=tokens["access_token"],
             refresh_token=tokens["refresh_token"],
@@ -231,6 +234,7 @@ async def update_email(
         )
 
     current_user.email = request.email
+    current_user.token_version += 1
     db.commit()
     db.refresh(current_user)
 
@@ -263,6 +267,7 @@ async def change_password(
         )
 
     current_user.hashed_password = hash_password(request.new_password)
+    current_user.token_version += 1
     db.commit()
 
     return MessageResponse(detail="Пароль успешно изменён")
@@ -275,6 +280,7 @@ async def delete_account(
 ) -> MessageResponse:
     """Деактивировать аккаунт (soft delete)."""
     current_user.is_active = False
+    current_user.token_version += 1
     db.commit()
 
     return MessageResponse(detail="Аккаунт деактивирован")
@@ -301,6 +307,7 @@ async def forgot_password(
         {
             "sub": user.email,
             "type": "password_reset",
+            "ver": user.token_version,
             "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         },
         SECRET_KEY,
@@ -347,7 +354,14 @@ async def reset_password(
             detail="Пользователь не найден",
         )
 
+    if payload.get("ver") != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недействительный или просроченный токен",
+        )
+
     user.hashed_password = hash_password(request.new_password)
+    user.token_version += 1
     db.commit()
 
     return MessageResponse(detail="Пароль успешно изменён")
