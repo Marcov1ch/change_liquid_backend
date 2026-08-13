@@ -40,6 +40,7 @@ class ComponentConfigResponse(BaseModel):
     name: str
     example: str
     default_interval: int
+    default_interval_months: int | None = None
 
 
 class ComponentConfigsResponse(BaseModel):

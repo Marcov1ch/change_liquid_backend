@@ -52,6 +52,7 @@ class EnumsHandler:
                 name=cfg.name,
                 example=cfg.example,
                 default_interval=cfg.default_interval,
+                default_interval_months=cfg.default_interval_months,
             )
             for cfg in COMPONENTS_CONFIG
         ]

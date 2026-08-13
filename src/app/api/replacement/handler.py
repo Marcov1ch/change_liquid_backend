@@ -21,6 +21,7 @@ from app.common.middleware import (
 )
 from app.common.enums import StatusEnum, ComponentType
 from app.common.utils.calculator import StatusCalculator
+from app.common.utils.interval_utils import add_months
 from app.services.notification_service import check_vehicle_notifications_background
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class ReplacementHandler:
         is_tire = replacement_dto.component_type == ComponentType.TIRE_CHANGE
 
         if not is_latest:
+            next_change_date = replacement_dto.next_change_date if is_tire else None
             return ReplacementResponse(
                 id=replacement_dto.id,
                 vehicle_id=replacement_dto.vehicle_id,
@@ -49,9 +51,9 @@ class ReplacementHandler:
                 replacement_date=replacement_dto.replacement_date,
                 km_at_replacement=replacement_dto.km_at_replacement,
                 interval_km=replacement_dto.interval_km,
-                next_replacement_km=0,
-                km_remaining=0,
-                next_change_date=replacement_dto.next_change_date,
+                next_replacement_km=None,
+                km_remaining=None,
+                next_change_date=next_change_date,
                 days_remaining=None,
                 status=StatusEnum.REPLACED.value,
             )
@@ -84,6 +86,15 @@ class ReplacementHandler:
             current_km=vehicle.current_km,
         )
 
+        next_change_date = None
+        days_remaining = None
+        months = vehicle.interval_months.get(replacement_dto.component_type.value)
+        if months is not None:
+            next_change_date = add_months(replacement_dto.replacement_date, months)
+            date_result = StatusCalculator.calculate_date_status(next_change_date)
+            next_change_date = date_result["next_change_date"]
+            days_remaining = date_result["days_remaining"]
+
         return ReplacementResponse(
             id=replacement_dto.id,
             vehicle_id=replacement_dto.vehicle_id,
@@ -96,8 +107,8 @@ class ReplacementHandler:
             interval_km=replacement_dto.interval_km,
             next_replacement_km=status_data["next_replacement_km"],
             km_remaining=status_data["km_remaining"],
-            next_change_date=None,
-            days_remaining=None,
+            next_change_date=next_change_date,
+            days_remaining=days_remaining,
             status=status_data["status"],
         )
 

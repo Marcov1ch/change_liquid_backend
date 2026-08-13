@@ -51,6 +51,7 @@ class VehicleHandler:
             is_active=vehicle_dto.is_active,
             intervals=vehicle_dto.intervals.copy(),
             notify_flags=vehicle_dto.notify_flags.copy(),
+            interval_months=vehicle_dto.interval_months.copy(),
             vehicle_status=vehicle_status_value,
         )
 
@@ -202,8 +203,14 @@ class VehicleHandler:
                 existing_dto.intervals.update(request.intervals)
             if request.notify_flags is not None:
                 existing_dto.notify_flags.update(request.notify_flags)
+            if request.interval_months is not None:
+                existing_dto.interval_months.update(request.interval_months)
 
             updated_dto = vehicle_service.update(existing_dto)
+
+            if request.interval_months is not None:
+                replacement_service = ReplacementService(db)
+                replacement_service.reset_date_notify_flags(vehicle.id)
 
             if request.current_km is not None:
                 background_tasks.add_task(

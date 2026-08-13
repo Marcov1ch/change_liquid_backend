@@ -11,6 +11,7 @@ class ComponentConfig:
     name_genitive: str
     example: str
     default_interval: int
+    default_interval_months: int | None = None
 
 
 COMPONENTS_CONFIG = [
@@ -22,6 +23,7 @@ COMPONENTS_CONFIG = [
         'моторного масла',
         'Mobil 1 5W-30',
         7000,
+        12,
     ),
     ComponentConfig(
         ComponentType.TRANSMISSION_OIL,
@@ -31,6 +33,7 @@ COMPONENTS_CONFIG = [
         'масла АКПП',
         'Toyota ATF WS',
         60000,
+        60,
     ),
     ComponentConfig(
         ComponentType.BRAKE_FLUID,
@@ -40,6 +43,7 @@ COMPONENTS_CONFIG = [
         'тормозной жидкости',
         'DOT 4',
         40000,
+        24,
     ),
     ComponentConfig(
         ComponentType.COOLANT,
@@ -49,6 +53,7 @@ COMPONENTS_CONFIG = [
         'антифриза',
         'CoolStream G12',
         60000,
+        24,
     ),
     ComponentConfig(
         ComponentType.POWER_STEERING_FLUID,
@@ -58,6 +63,7 @@ COMPONENTS_CONFIG = [
         'жидкости ГУР',
         'Pentosin CHF 11S',
         40000,
+        60,
     ),
     ComponentConfig(
         ComponentType.DIFFERENTIAL_OIL,
@@ -67,6 +73,7 @@ COMPONENTS_CONFIG = [
         'масла в редукторе',
         '75W-90 GL-5',
         50000,
+        60,
     ),
     ComponentConfig(
         ComponentType.CABIN_FILTER,
@@ -76,6 +83,7 @@ COMPONENTS_CONFIG = [
         'фильтра салона',
         'MANN CUK 2643',
         15000,
+        12,
     ),
     ComponentConfig(
         ComponentType.SPARK_PLUGS,
@@ -85,6 +93,7 @@ COMPONENTS_CONFIG = [
         'свечей зажигания',
         'NGK BKR6E',
         45000,
+        24,
     ),
     ComponentConfig(
         ComponentType.AIR_FILTER,
@@ -94,5 +103,6 @@ COMPONENTS_CONFIG = [
         'воздушного фильтра',
         'MANN C 36106',
         10000,
+        12,
     ),
 ]
