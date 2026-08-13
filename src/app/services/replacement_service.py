@@ -2,7 +2,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 from app.api.replacement.schema import ReplacementCreateRequest
 from app.common.enums import ComponentType
-from app.common.utils.interval_utils import ComponentIntervalUtils
+from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
 from app.services.dto import ReplacementDTO, VehicleDTO
@@ -65,6 +65,15 @@ class ReplacementService:
         interval_km = (0 if is_tire
                        else ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type))
 
+        next_change_date = request.next_change_date
+        interval_months = None
+        if not is_tire:
+            interval_months = ComponentIntervalUtils.get_interval_months_for_component(
+                vehicle_dto, request.component_type,
+            )
+            if interval_months is not None:
+                next_change_date = add_months(request.replacement_date, interval_months)
+
         replacement = ReplacementDTO(
             id=None,
             vehicle_id=vehicle_id,
@@ -75,7 +84,8 @@ class ReplacementService:
             replacement_date=request.replacement_date,
             km_at_replacement=request.km_at_replacement,
             interval_km=interval_km,
-            next_change_date=request.next_change_date,
+            interval_months=interval_months,
+            next_change_date=next_change_date,
         )
 
         return self.repository.save(replacement, commit=commit)
@@ -165,6 +175,16 @@ class ReplacementService:
                 exclude_id=replacement_id,
             )
 
+            if replacement.component_type != ComponentType.TIRE_CHANGE:
+                if vehicle_dto is not None:
+                    new_next_date = ComponentIntervalUtils.get_next_change_date(
+                        vehicle_dto, replacement.component_type, new_date,
+                    )
+                    if new_next_date != replacement.next_change_date:
+                        kwargs['next_change_date'] = new_next_date
+                        kwargs['date_warning_notified'] = False
+                        kwargs['date_overdue_notified'] = False
+
         for key, value in kwargs.items():
             if value is not None and hasattr(replacement, key):
                 setattr(replacement, key, value)
@@ -183,6 +203,10 @@ class ReplacementService:
     def delete_by_vehicle(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все замены для автомобиля."""
         return self.repository.delete_by_vehicle_id(vehicle_id, commit)  # type: ignore[no-any-return]
+
+    def reset_date_notify_flags(self, vehicle_id: int) -> int:
+        """Сбросить флаги date-уведомлений для non-tire замен автомобиля."""
+        return self.repository.reset_date_notify_flags(vehicle_id)  # type: ignore[no-any-return]
 
     def _validate_common(
         self,

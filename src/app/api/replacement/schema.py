@@ -47,12 +47,12 @@ class ReplacementResponse(ReplacementBase):
         ...,
         description='Интервал замены (из настроек авто)',
     )
-    next_replacement_km: int = Field(
-        ...,
+    next_replacement_km: int | None = Field(
+        None,
         description='Следующая замена при пробеге',
     )
-    km_remaining: int = Field(
-        ...,
+    km_remaining: int | None = Field(
+        None,
         description='Остаток в километрах до замены',
     )
     next_change_date: date | None = Field(

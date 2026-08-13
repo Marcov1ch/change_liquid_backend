@@ -9,13 +9,18 @@ class VehicleCreateRequest(VehicleBase):
     """Модель запроса создания авто."""
     intervals: dict[str, int] = Field(
         default_factory=dict,
-        description='Интервалы замен по компонентам',
+        description='Интервалы замен по компонентам (км)',
         examples=[{"engine_oil": 7000, "transmission_oil": 60000}],
     )
     notify_flags: dict[str, bool] = Field(
         default_factory=dict,
         description='Настройки уведомлений по компонентам',
         examples=[{"engine_oil": True, "transmission_oil": True}],
+    )
+    interval_months: dict[str, int | None] = Field(
+        default_factory=dict,
+        description='Интервалы замен по компонентам (месяцы)',
+        examples=[{"engine_oil": 12, "brake_fluid": 24}],
     )
 
 
@@ -40,6 +45,10 @@ class VehicleResponse(VehicleBase):
     notify_flags: dict[str, bool] = Field(
         default_factory=dict,
         description='Настройки уведомлений',
+    )
+    interval_months: dict[str, int | None] = Field(
+        default_factory=dict,
+        description='Интервалы замен по компонентам (месяцы)',
     )
     km_remaining: dict[str, int | None] = Field(
         default_factory=dict,
@@ -71,6 +80,10 @@ class UpdateVehicleData(BaseModel):
     notify_flags: dict[str, bool] | None = Field(
         None,
         description='Настройки уведомлений для обновления',
+    )
+    interval_months: dict[str, int | None] | None = Field(
+        None,
+        description='Интервалы замен по компонентам (месяцы) для обновления',
     )
 
     @field_validator('plate_number')

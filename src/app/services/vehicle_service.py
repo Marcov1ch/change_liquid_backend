@@ -30,10 +30,13 @@ class VehicleService:
 
         intervals = {}
         notify_flags = {}
+        interval_months = {}
         if hasattr(vehicle_data, 'intervals'):
             intervals = vehicle_data.intervals
         if hasattr(vehicle_data, 'notify_flags'):
             notify_flags = vehicle_data.notify_flags
+        if hasattr(vehicle_data, 'interval_months'):
+            interval_months = vehicle_data.interval_months
 
         dto = VehicleDTO(
             id=None,
@@ -48,6 +51,7 @@ class VehicleService:
             owner_id=user_id,
             intervals=intervals,
             notify_flags=notify_flags,
+            interval_months=interval_months,
         )
 
         return self.repository.save(dto)

@@ -250,6 +250,7 @@ class ReplacementRepository:
             "id": db_replacement.id,
             "component_type": db_replacement.component_type,
             "component_name": db_replacement.component_name,
+            "replacement_date": db_replacement.replacement_date,
             "km_at_replacement": db_replacement.km_at_replacement,
             "interval_km": db_replacement.interval_km,
             "warning_notified": db_replacement.warning_notified,
@@ -344,6 +345,19 @@ class ReplacementRepository:
             if date_overdue_notified is not None:
                 db_replacement.date_overdue_notified = date_overdue_notified
             self.db.commit()
+
+    def reset_date_notify_flags(self, vehicle_id: int, commit: bool = True) -> int:
+        """Сбросить флаги date-уведомлений у non-tire замен автомобиля."""
+        count = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.component_type != ComponentType.TIRE_CHANGE.value,
+        ).update({
+            ReplacementDB.date_warning_notified: False,
+            ReplacementDB.date_overdue_notified: False,
+        })
+        if commit:
+            self.db.commit()
+        return count  # type: ignore[no-any-return]
 
     def delete(self, replacement_id: int) -> bool:
         """Удалить запись о замене."""

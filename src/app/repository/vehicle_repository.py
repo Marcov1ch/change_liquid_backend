@@ -13,20 +13,28 @@ class VehicleRepository:
         self.db = db
 
     @staticmethod
-    def _intervals_and_flags(db_vehicle: VehicleDB) -> tuple[dict[str, int], dict[str, bool]]:
+    def _intervals_and_flags(
+        db_vehicle: VehicleDB,
+    ) -> tuple[dict[str, int], dict[str, bool], dict[str, int | None]]:
         """Собрать интервалы и флаги уведомлений из ORM-модели."""
         intervals: dict[str, int] = {}
         notify_flags: dict[str, bool] = {}
+        interval_months: dict[str, int | None] = {}
         for cfg in COMPONENTS_CONFIG:
             intervals[cfg.type.value] = getattr(db_vehicle, cfg.interval_field) or cfg.default_interval
             notify_flags[cfg.type.value] = getattr(db_vehicle, cfg.notify_field)
+            months_field = cfg.interval_field.replace('_km', '_months')
+            months_value = getattr(db_vehicle, months_field)
+            if months_value is None and cfg.default_interval_months is not None:
+                months_value = cfg.default_interval_months
+            interval_months[cfg.type.value] = months_value
         notify_flags['tire_change'] = bool(getattr(db_vehicle, 'tire_notify_enabled', True))
-        return intervals, notify_flags
+        return intervals, notify_flags, interval_months
 
     @staticmethod
     def _to_dto(db_vehicle: VehicleDB) -> VehicleDTO:
         """Преобразовать ORM-модель в DTO."""
-        intervals, notify_flags = VehicleRepository._intervals_and_flags(db_vehicle)
+        intervals, notify_flags, interval_months = VehicleRepository._intervals_and_flags(db_vehicle)
         return VehicleDTO(
             id=db_vehicle.id,
             brand=db_vehicle.brand_ref.name,
@@ -40,6 +48,7 @@ class VehicleRepository:
             owner_id=db_vehicle.owner_id,
             intervals=intervals,
             notify_flags=notify_flags,
+            interval_months=interval_months,
         )
 
     def _apply_intervals(self, db_vehicle: VehicleDB, dto: VehicleDTO) -> None:
@@ -47,6 +56,10 @@ class VehicleRepository:
         for cfg in COMPONENTS_CONFIG:
             setattr(db_vehicle, cfg.interval_field, dto.intervals.get(cfg.type.value, cfg.default_interval))
             setattr(db_vehicle, cfg.notify_field, dto.notify_flags.get(cfg.type.value, True))
+            months = dto.interval_months.get(cfg.type.value)
+            if months is None:
+                months = cfg.default_interval_months
+            setattr(db_vehicle, cfg.interval_field.replace('_km', '_months'), months)
         tire_notify = dto.notify_flags.get('tire_change')
         if tire_notify is not None:
             db_vehicle.tire_notify_enabled = tire_notify
@@ -168,7 +181,7 @@ class VehicleRepository:
     @staticmethod
     def _to_owner_dict(v: VehicleDB) -> dict:
         """Собрать словарь авто с информацией о владельце для уведомлений."""
-        intervals, notify_flags = VehicleRepository._intervals_and_flags(v)
+        intervals, notify_flags, interval_months = VehicleRepository._intervals_and_flags(v)
         return {
             "id": v.id,
             "brand": v.brand_ref.name,
@@ -176,6 +189,7 @@ class VehicleRepository:
             "plate_number": v.plate_number,
             "current_km": v.current_km,
             "intervals": intervals,
+            "interval_months": interval_months,
             "notify_flags": notify_flags,
             "owner_email": v.owner.email if v.owner else "",
             "owner_username": v.owner.username if v.owner else "",

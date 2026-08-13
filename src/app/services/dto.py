@@ -19,6 +19,7 @@ class VehicleDTO:
     owner_id: int
     intervals: dict[str, int] = field(default_factory=dict)
     notify_flags: dict[str, bool] = field(default_factory=dict)
+    interval_months: dict[str, int | None] = field(default_factory=dict)
 
 
 @dataclass
