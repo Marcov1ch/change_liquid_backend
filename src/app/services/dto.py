@@ -20,6 +20,8 @@ class VehicleDTO:
     intervals: dict[str, int] = field(default_factory=dict)
     notify_flags: dict[str, bool] = field(default_factory=dict)
     interval_months: dict[str, int | None] = field(default_factory=dict)
+    rims: list[dict[str, int | float | None]] = field(default_factory=list)
+    tires: list[dict[str, str | None]] = field(default_factory=list)
 
 
 @dataclass

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Float
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime, timezone
 
@@ -96,6 +96,31 @@ class VehicleDB(Base):  # type: ignore
     model_ref = relationship("ModelDB", lazy="joined")
 
     replacements = relationship("ReplacementDB", back_populates="vehicle")
+    sizes = relationship("VehicleSizeDB", backref="vehicle", cascade="all, delete-orphan")
+
+
+class VehicleSizeDB(Base):  # type: ignore
+    """Позиция диска или шины автомобиля."""
+
+    __tablename__ = "vehicle_sizes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String, nullable=False)  # 'rim' | 'tire'
+
+    # Disk fields
+    diameter = Column(Integer, nullable=True)
+    pcd = Column(String, nullable=True)
+    et_from = Column(Integer, nullable=True)
+    et_to = Column(Integer, nullable=True)
+    width_from = Column(Float, nullable=True)
+    width_to = Column(Float, nullable=True)
+
+    # Tire fields
+    size = Column(String, nullable=True)
+    label = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class ReplacementDB(Base):  # type: ignore

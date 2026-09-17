@@ -35,6 +35,25 @@ class VehicleRepository:
     def _to_dto(db_vehicle: VehicleDB) -> VehicleDTO:
         """Преобразовать ORM-модель в DTO."""
         intervals, notify_flags, interval_months = VehicleRepository._intervals_and_flags(db_vehicle)
+
+        rims: list[dict[str, int | float | None]] = []
+        tires: list[dict[str, str | None]] = []
+        for size in db_vehicle.sizes:
+            if size.kind == 'rim':
+                rims.append({
+                    'diameter': size.diameter,
+                    'pcd': size.pcd,
+                    'et_from': size.et_from,
+                    'et_to': size.et_to,
+                    'width_from': size.width_from,
+                    'width_to': size.width_to,
+                })
+            elif size.kind == 'tire':
+                tires.append({
+                    'size': size.size,
+                    'label': size.label,
+                })
+
         return VehicleDTO(
             id=db_vehicle.id,
             brand=db_vehicle.brand_ref.name,
@@ -49,6 +68,8 @@ class VehicleRepository:
             intervals=intervals,
             notify_flags=notify_flags,
             interval_months=interval_months,
+            rims=rims,
+            tires=tires,
         )
 
     def _apply_intervals(self, db_vehicle: VehicleDB, dto: VehicleDTO) -> None:
@@ -143,6 +164,40 @@ class VehicleRepository:
             self.db.refresh(db_vehicle)
             return self._to_dto(db_vehicle)
         return None
+
+    def replace_sizes(self, vehicle_id: int, rims: list[dict], tires: list[dict]) -> VehicleDTO | None:
+        """Полная замена списков дисков и шин."""
+        from app.db.models import VehicleSizeDB
+
+        db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
+        if not db_vehicle:
+            return None
+
+        db_vehicle.sizes.clear()
+
+        for r in rims:
+            db_vehicle.sizes.append(VehicleSizeDB(
+                kind='rim',
+                vehicle_id=vehicle_id,
+                diameter=r.get('diameter'),
+                pcd=r.get('pcd'),
+                et_from=r.get('et_from'),
+                et_to=r.get('et_to'),
+                width_from=r.get('width_from'),
+                width_to=r.get('width_to'),
+            ))
+
+        for t in tires:
+            db_vehicle.sizes.append(VehicleSizeDB(
+                kind='tire',
+                vehicle_id=vehicle_id,
+                size=t.get('size'),
+                label=t.get('label'),
+            ))
+
+        self.db.commit()
+        self.db.refresh(db_vehicle)
+        return self._to_dto(db_vehicle)
 
     def delete(self, vehicle_id: int) -> bool:
         """Мягкое удаление авто (is_active = False)."""

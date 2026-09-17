@@ -11,6 +11,7 @@ from app.api.vehicle.schema import (
     UpdateVehicleData,
     VehicleUpdateIntervals,
     UpdateVehicleNotify,
+    UpdateVehicleSizes,
 )
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
@@ -53,6 +54,8 @@ class VehicleHandler:
             notify_flags=vehicle_dto.notify_flags.copy(),
             interval_months=vehicle_dto.interval_months.copy(),
             vehicle_status=vehicle_status_value,
+            rims=[dict(r) for r in vehicle_dto.rims],
+            tires=[dict(t) for t in vehicle_dto.tires],
         )
 
     def _calc_remaining(
@@ -311,6 +314,35 @@ class VehicleHandler:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail='Не удалось обновить настройки уведомлений',
+            )
+
+    async def update_sizes(
+        self,
+        request: UpdateVehicleSizes,
+        db: Session = Depends(get_db),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
+    ) -> VehicleResponse:
+        """Обновить списки допустимых дисков и шин."""
+        vehicle_service = VehicleService(db)
+        try:
+            rims = [r.model_dump() for r in request.rims]
+            tires = [t.model_dump() for t in request.tires]
+
+            updated_dto = vehicle_service.repository.replace_sizes(vehicle.id, rims, tires)
+            if updated_dto is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail='Автомобиль не найден',
+                )
+
+            return self._to_response(updated_dto)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception('Failed to update vehicle sizes')
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Не удалось обновить размеры дисков и шин',
             )
 
     async def delete_vehicle(

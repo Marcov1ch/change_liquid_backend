@@ -1,8 +1,55 @@
 from datetime import date
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from app.common.schemas.base_vehicle import VehicleBase, normalize_plate_number
+
+
+class RimSize(BaseModel):
+    """Позиция диска автомобиля."""
+    diameter: int | None = Field(None, description='Диаметр диска в дюймах', examples=[16], ge=1)
+    pcd: str | None = Field(None, description='Сверловка (PCD)', examples=['5x114.3'], max_length=30)
+    et_from: int | None = Field(None, description='Вылет диска, от', examples=[45], ge=-100, le=200)
+    et_to: int | None = Field(None, description='Вылет диска, до', examples=[50], ge=-100, le=200)
+    width_from: float | None = Field(None, description='Ширина диска в дюймах, от', examples=[6], ge=1, le=30)
+    width_to: float | None = Field(None, description='Ширина диска в дюймах, до', examples=[6.5], ge=1, le=30)
+
+    @field_validator('et_to')
+    @classmethod
+    def validate_et_range(cls, v: int | None, info: ValidationInfo) -> int | None:
+        if v is not None and info.data.get('et_from') is not None and v < info.data['et_from']:
+            raise ValueError('Верхняя граница вылета не может быть меньше нижней')
+        return v
+
+    @field_validator('width_to')
+    @classmethod
+    def validate_width_range(cls, v: float | None, info: ValidationInfo) -> float | None:
+        if v is not None and info.data.get('width_from') is not None and v < info.data['width_from']:
+            raise ValueError('Верхняя граница ширины не может быть меньше нижней')
+        return v
+
+
+class TireSize(BaseModel):
+    """Позиция шины автомобиля."""
+    size: str = Field(..., description='Размер шины', examples=['215/65 R16'], min_length=1, max_length=30)
+    label: str | None = Field(
+        None,
+        description='Подпись (сезон, бренд и т.п.)',
+        examples=['лето'],
+        max_length=50,
+    )
+
+
+class UpdateVehicleSizes(BaseModel):
+    """Обновление списков дисков и шин (полная замена)."""
+    rims: list[RimSize] = Field(
+        default_factory=list,
+        description='Список допустимых дисков',
+    )
+    tires: list[TireSize] = Field(
+        default_factory=list,
+        description='Список допустимых размеров шин',
+    )
 
 
 class VehicleCreateRequest(VehicleBase):
@@ -53,6 +100,14 @@ class VehicleResponse(VehicleBase):
     km_remaining: dict[str, int | None] = Field(
         default_factory=dict,
         description='Остаток км до замены по каждому компоненту',
+    )
+    rims: list[RimSize] = Field(
+        default_factory=list,
+        description='Список допустимых дисков',
+    )
+    tires: list[TireSize] = Field(
+        default_factory=list,
+        description='Список допустимых размеров шин',
     )
 
 
