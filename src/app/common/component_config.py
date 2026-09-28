@@ -105,4 +105,14 @@ COMPONENTS_CONFIG = [
         10000,
         12,
     ),
+    ComponentConfig(
+        ComponentType.FUEL_FILTER,
+        'fuel_filter_interval_km',
+        'fuel_filter_notify_enabled',
+        'Топливный фильтр',
+        'топливного фильтра',
+        'Bosch F026403850',
+        50000,
+        24,
+    ),
 ]

@@ -12,6 +12,7 @@ class ComponentType(Enum):
     CABIN_FILTER = "cabin_filter"
     SPARK_PLUGS = "spark_plugs"
     AIR_FILTER = "air_filter"
+    FUEL_FILTER = "fuel_filter"
     TIRE_CHANGE = "tire_change"
 
 
