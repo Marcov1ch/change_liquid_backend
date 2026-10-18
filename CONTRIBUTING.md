@@ -46,12 +46,15 @@ make install
 ## Локальный запуск сервиса
 Из корневой директории выполнить:
 ```shell script
-python src/app/main.py
-```
-Или
-```shell script
 make run
 ```
+Команда запускает приложение с `PYTHONPATH=src` (`poetry run python src/app/main.py`).
+
+## Проверки перед сдачей работы
+```shell script
+make check
+```
+`make check` = `make lint` (flake8) + `make mypy` + `make test`. Дополнительно можно прогнать `make ruff` (в CI не используется). Очистка кэшей: `make clean`.
 
 ## База данных и миграции
 
@@ -69,7 +72,7 @@ make run
 3. Проверить сгенерированную миграцию (ожидаем `op.add_column` / `op.drop_column`, без пересоздания таблиц).
 4. Применить: `alembic upgrade head`. На проде колонка добавится через `ALTER TABLE ... ADD COLUMN`, данные сохранятся.
 
-Запрещено: редактировать схему БД вручную и использовать `create_all` в рантайме.
+Запрещено: редактировать схему БД вручную и вызывать `create_all` вне `src/app/db/migrate.py`. Внутри `migrate.py` `create_all` для пустой БД — штатное поведение (см. AGENTS.md).
 
 ### Собрать образ
 ```shell script

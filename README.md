@@ -2,6 +2,8 @@
 
 Backend-сервис для учёта замены технических жидкостей и расходников автомобиля (моторное масло, антифриз, фильтры, свечи, шины и др.) с отслеживанием статусов замен и email-уведомлениями.
 
+Доменные правила (статусы, компоненты, интервалы, уведомления) — в [DOMAIN.md](DOMAIN.md).
+
 ## Возможности
 
 - Учёт автомобилей (марка/модель из справочника, госномер РФ/РБ, пробег)
@@ -31,9 +33,9 @@ src/app/
 ### Локальный запуск
 
 ```shell
-poetry install
+make install           # установка зависимостей (poetry install)
 cp .env.example .env   # подставьте свои значения
-make run               # или: python src/app/main.py
+make run
 ```
 
 Документация API (Swagger): http://localhost:8000/docs
@@ -74,7 +76,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 make test     # pytest
 make lint     # flake8
 make mypy     # проверка типов
-make ruff     # ruff
+make ruff     # ruff (локально, в CI нет)
+make check    # lint + mypy + test (перед сдачей работы)
+make clean    # очистка кэшей (__pycache__, .pytest_cache, .mypy_cache, .ruff_cache)
 ```
 
 ## Деплой
