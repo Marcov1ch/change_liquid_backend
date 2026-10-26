@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException, status, Depends, BackgroundTasks, Query
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,8 @@ from app.api.vehicle.schema import (
 )
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
+from app.common.constants import MSG_PLATE_NUMBER_EXISTS
+from app.common.exceptions import VehicleConflictError
 from app.common.middleware import verify_vehicle_access, verify_vehicle_view_access
 from app.db.database import get_db
 from app.db.models import UserDB
@@ -28,8 +31,6 @@ from app.services.notification_service import check_vehicle_notifications_backgr
 
 
 logger = logging.getLogger(__name__)
-
-_MSG_PLATE_NUMBER_EXISTS = 'Автомобиль с госномером {plate_number} уже существует'
 
 
 class VehicleHandler:
@@ -155,7 +156,7 @@ class VehicleHandler:
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
+                    detail=MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
                 )
 
             vehicle_dto = vehicle_service.create(current_user.id, request)
@@ -175,53 +176,44 @@ class VehicleHandler:
                 detail='Не удалось создать автомобиль',
             )
 
+    @staticmethod
+    def _changed_fields(request: BaseModel) -> dict:
+        """Выделить поля, переданные в запросе (без явных None верхнего уровня)."""
+        return {
+            key: value
+            for key, value in request.model_dump(exclude_unset=True).items()
+            if value is not None
+        }
+
     async def update_vehicle(
         self,
         request: UpdateVehicleData,
+        background_tasks: BackgroundTasks,
         db: Session = Depends(get_db),
         vehicle: VehicleDTO = Depends(verify_vehicle_access),
-        background_tasks: BackgroundTasks = BackgroundTasks(),
     ) -> VehicleResponse:
         """Обновить данные авто."""
         vehicle_service = VehicleService(db)
+        payload = self._changed_fields(request)
         try:
-            existing_dto = vehicle
+            updated_dto = vehicle_service.partial_update(vehicle, payload)
 
-            if request.brand is not None or request.model is not None:
-                vehicle_service.update_brand_model(existing_dto, request.brand, request.model)
-            if request.plate_number is not None:
-                existing = vehicle_service.get_by_plate_number(request.plate_number)
-                if existing and existing.id != vehicle.id:
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
-                    )
-                existing_dto.plate_number = request.plate_number
-            if request.year is not None:
-                existing_dto.year = request.year
-            if request.current_km is not None:
-                vehicle_service.validate_km_not_below_replacements(vehicle.id, request.current_km)
-                existing_dto.current_km = request.current_km
-            if request.intervals is not None:
-                existing_dto.intervals.update(request.intervals)
-            if request.notify_flags is not None:
-                existing_dto.notify_flags.update(request.notify_flags)
-            if request.interval_months is not None:
-                existing_dto.interval_months.update(request.interval_months)
-
-            updated_dto = vehicle_service.update(existing_dto)
-
-            if request.interval_months is not None:
+            if 'interval_months' in payload:
                 replacement_service = ReplacementService(db)
                 replacement_service.reset_date_notify_flags(vehicle.id)
 
-            if request.current_km is not None:
+            if 'current_km' in payload:
                 background_tasks.add_task(
                     check_vehicle_notifications_background,
                     vehicle.id,
                 )
 
             return self._to_response(updated_dto)
+        except VehicleConflictError as err:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(err),
+            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -231,9 +223,14 @@ class VehicleHandler:
             raise
         except IntegrityError:
             db.rollback()
+            detail = (
+                MSG_PLATE_NUMBER_EXISTS.format(plate_number=payload['plate_number'])
+                if payload.get('plate_number') is not None
+                else 'Автомобиль с такими данными уже существует'
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=_MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
+                detail=detail,
             )
         except Exception:
             logger.exception('Failed to update vehicle')
@@ -245,9 +242,9 @@ class VehicleHandler:
     async def update_vehicle_km(
         self,
         request: UpdateKMRequest,
+        background_tasks: BackgroundTasks,
         db: Session = Depends(get_db),
         vehicle: VehicleDTO = Depends(verify_vehicle_access),
-        background_tasks: BackgroundTasks = BackgroundTasks(),
     ) -> VehicleResponse:
         """Обновить пробег авто."""
         vehicle_service = VehicleService(db)
@@ -282,12 +279,22 @@ class VehicleHandler:
     ) -> VehicleResponse:
         """Обновить интервалы замен."""
         vehicle_service = VehicleService(db)
+        payload = self._changed_fields(request)
         try:
-            if request.intervals is not None:
-                vehicle.intervals.update(request.intervals)
-
-            updated_dto = vehicle_service.update(vehicle)
+            updated_dto = vehicle_service.partial_update(vehicle, payload)
             return self._to_response(updated_dto)
+        except VehicleConflictError as err:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(err),
+            )
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(err),
+            )
+        except HTTPException:
+            raise
         except Exception:
             logger.exception('Failed to update vehicle intervals')
             raise HTTPException(
@@ -303,12 +310,22 @@ class VehicleHandler:
     ) -> VehicleResponse:
         """Обновить настройки уведомлений для авто."""
         vehicle_service = VehicleService(db)
+        payload = self._changed_fields(request)
         try:
-            if request.notify_flags is not None:
-                vehicle.notify_flags.update(request.notify_flags)
-
-            updated_dto = vehicle_service.update(vehicle)
+            updated_dto = vehicle_service.partial_update(vehicle, payload)
             return self._to_response(updated_dto)
+        except VehicleConflictError as err:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(err),
+            )
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(err),
+            )
+        except HTTPException:
+            raise
         except Exception:
             logger.exception('Failed to update vehicle notify settings')
             raise HTTPException(
