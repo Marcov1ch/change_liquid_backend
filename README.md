@@ -77,6 +77,7 @@ make test     # pytest
 make lint     # flake8
 make mypy     # проверка типов
 make ruff     # ruff (локально, в CI нет)
+make radon    # анализ сложности кода (блоки C-F + средняя сложность)
 make check    # lint + mypy + test (перед сдачей работы)
 make clean    # очистка кэшей (__pycache__, .pytest_cache, .mypy_cache, .ruff_cache)
 ```

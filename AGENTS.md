@@ -9,6 +9,7 @@
 - `make lint` — проверка стиля (flake8, лимит 110 символов, см. setup.cfg)
 - `make mypy` — проверка типов (mypy)
 - `make ruff` — проверка через ruff (`poetry run ruff check src`)
+- `make radon` — анализ сложности кода: только проблемные блоки C-F и средняя сложность по всему коду (`poetry run radon cc src -s --total-average -n C`)
 - `make check` — `lint + mypy + test` одной командой (проверка перед сдачей работы)
 - `make clean` — очистка кэшей (`__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`)
 
