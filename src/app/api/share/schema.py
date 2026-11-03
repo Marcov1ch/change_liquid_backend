@@ -72,7 +72,7 @@ class PublicReplacementResponse(BaseModel):
         description='Дата следующей замены',
     )
     days_remaining: int | None = Field(
-        None, 
+        None,
         description='Остаток дней до замены',
     )
     status: StatusEnum = Field(
