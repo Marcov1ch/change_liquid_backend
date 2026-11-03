@@ -167,6 +167,37 @@ def test_create_computes_next_change_date_from_vehicle_months(
     assert result.interval_months == 12
 
 
+def test_get_tire_km_traveled_counts_between_records() -> None:
+    first = ReplacementDTO(
+        id=1, vehicle_id=1,
+        component_type=ComponentType.TIRE_CHANGE,
+        component_name='Зимние',
+        component_price=0,
+        work_price=0,
+        replacement_date=date(2024, 1, 1),
+        km_at_replacement=10000,
+        interval_km=0,
+    )
+    second = ReplacementDTO(
+        id=2, vehicle_id=1,
+        component_type=ComponentType.TIRE_CHANGE,
+        component_name='Летние',
+        component_price=0,
+        work_price=0,
+        replacement_date=date(2024, 6, 1),
+        km_at_replacement=15000,
+        interval_km=0,
+    )
+
+    service = ReplacementService.__new__(ReplacementService)
+    service.repository = MagicMock()
+    service.repository.find_by_vehicle_and_component.return_value = [second, first]
+
+    result = service.get_tire_km_traveled(1, 18000)
+
+    assert result == {1: 5000, 2: 3000}
+
+
 def test_reset_date_notify_flags_delegates_to_repository() -> None:
     service = ReplacementService.__new__(ReplacementService)
     service.repository = MagicMock()

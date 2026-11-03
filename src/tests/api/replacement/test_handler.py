@@ -62,3 +62,22 @@ def test_archival_tire_keeps_stored_date() -> None:
     response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=False)
     assert response.next_change_date == date(2026, 11, 1)
     assert response.next_replacement_km is None
+
+
+def test_latest_tire_km_traveled_from_current_km() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.TIRE_CHANGE)
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=True)
+    assert response.km_traveled == 5000
+
+
+def test_tire_km_traveled_uses_passed_value() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.TIRE_CHANGE)
+    response = ReplacementHandler()._to_response(
+        replacement,
+        vehicle,
+        is_latest=False,
+        km_traveled=2500,
+    )
+    assert response.km_traveled == 2500

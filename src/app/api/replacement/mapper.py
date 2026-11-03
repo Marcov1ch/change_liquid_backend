@@ -9,9 +9,12 @@ def build_replacement_response(
     replacement_dto: ReplacementDTO,
     vehicle: VehicleDTO,
     is_latest: bool = True,
+    km_traveled: int | None = None,
 ) -> ReplacementResponse:
     """Преобразовать DTO замены в ответ с расчётом статуса."""
     is_tire = replacement_dto.component_type == ComponentType.TIRE_CHANGE
+    if is_tire and km_traveled is None:
+        km_traveled = max(0, vehicle.current_km - replacement_dto.km_at_replacement)
 
     if not is_latest:
         next_change_date = replacement_dto.next_change_date if is_tire else None
@@ -27,6 +30,7 @@ def build_replacement_response(
             interval_km=replacement_dto.interval_km,
             next_replacement_km=None,
             km_remaining=None,
+            km_traveled=km_traveled,
             next_change_date=next_change_date,
             days_remaining=None,
             status=StatusEnum.REPLACED.value,
@@ -48,6 +52,7 @@ def build_replacement_response(
             interval_km=replacement_dto.interval_km,
             next_replacement_km=0,
             km_remaining=0,
+            km_traveled=km_traveled,
             next_change_date=status_data["next_change_date"],
             days_remaining=status_data["days_remaining"],
             status=status_data["status"],
@@ -81,6 +86,7 @@ def build_replacement_response(
         interval_km=replacement_dto.interval_km,
         next_replacement_km=status_data["next_replacement_km"],
         km_remaining=status_data["km_remaining"],
+        km_traveled=km_traveled,
         next_change_date=next_change_date,
         days_remaining=days_remaining,
         status=status_data["status"],

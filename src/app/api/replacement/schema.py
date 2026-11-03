@@ -55,6 +55,10 @@ class ReplacementResponse(ReplacementBase):
         None,
         description='Остаток в километрах до замены',
     )
+    km_traveled: int | None = Field(
+        None,
+        description='Пройдено километров с момента замены (для шин)',
+    )
     next_change_date: date | None = Field(
         None,
         description='Дата следующей обязательной замены',

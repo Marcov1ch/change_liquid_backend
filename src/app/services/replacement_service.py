@@ -56,11 +56,12 @@ class ReplacementService:
                 request.component_type,
                 request.km_at_replacement,
             )
-            self._update_vehicle_km_if_needed(
-                vehicle_dto,
-                request.km_at_replacement,
-                commit,
-            )
+
+        self._update_vehicle_km_if_needed(
+            vehicle_dto,
+            request.km_at_replacement,
+            commit,
+        )
 
         interval_km = (0 if is_tire
                        else ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type))
@@ -110,6 +111,32 @@ class ReplacementService:
         """Получить id последних замен по каждому типу компонента авто."""
         return self.repository.get_latest_replacement_ids(vehicle_id)  # type: ignore[no-any-return]
 
+    def get_tire_km_traveled(
+        self,
+        vehicle_id: int,
+        current_km: int,
+    ) -> dict[int, int]:
+        """Рассчитать пройденный пробег для каждой записи о замене шин."""
+        tires = self.repository.find_by_vehicle_and_component(
+            vehicle_id, ComponentType.TIRE_CHANGE,
+        )
+        ordered = sorted(
+            tires,
+            key=lambda r: (r.km_at_replacement, r.replacement_date, r.id or 0),
+        )
+
+        traveled: dict[int, int] = {}
+        for index, tire in enumerate(ordered):
+            if tire.id is None:
+                continue
+            end_km = (
+                ordered[index + 1].km_at_replacement
+                if index + 1 < len(ordered)
+                else current_km
+            )
+            traveled[tire.id] = max(0, end_km - tire.km_at_replacement)
+        return traveled
+
     def get_by_vehicles(
         self,
         vehicle_ids: list[int],
@@ -149,6 +176,7 @@ class ReplacementService:
 
         new_km = kwargs.get('km_at_replacement')
         new_date = kwargs.get('replacement_date')
+        is_tire = replacement.component_type == ComponentType.TIRE_CHANGE
 
         vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
 
@@ -156,24 +184,26 @@ class ReplacementService:
             if new_km < 0:
                 raise ValueError('Пробег не может быть отрицательным')
 
-            self._validate_sequence(
-                replacement.vehicle_id,
-                replacement.component_type,
-                new_km,
-                replacement.replacement_date,
-                exclude_id=replacement_id,
-            )
+            if not is_tire:
+                self._validate_sequence(
+                    replacement.vehicle_id,
+                    replacement.component_type,
+                    new_km,
+                    replacement.replacement_date,
+                    exclude_id=replacement_id,
+                )
 
         if new_date is not None:
             if new_date > date.today():
                 raise ValueError('Дата не может быть в будущем')
-            self._validate_sequence(
-                replacement.vehicle_id,
-                replacement.component_type,
-                replacement.km_at_replacement,
-                new_date,
-                exclude_id=replacement_id,
-            )
+            if not is_tire:
+                self._validate_sequence(
+                    replacement.vehicle_id,
+                    replacement.component_type,
+                    replacement.km_at_replacement,
+                    new_date,
+                    exclude_id=replacement_id,
+                )
 
             if replacement.component_type != ComponentType.TIRE_CHANGE:
                 if vehicle_dto is not None:
