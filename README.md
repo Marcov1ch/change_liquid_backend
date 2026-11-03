@@ -11,6 +11,7 @@ Backend-сервис для учёта замены технических жи�
 - Статусы замен: `good` / `warning` / `critical` / `overdue` / `replaced`
 - Email-уведомления о приближении/просрочке замен (ежедневный scheduler в 09:00)
 - Регистрация и JWT-авторизация (access/refresh), смена пароля и email, восстановление пароля
+- Публичный доступ к истории замен по QR-коду: ссылку можно включить, обновить или отключить
 
 ## Стек
 
@@ -59,7 +60,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 | `SMTP_USER` | нет | — | Логин SMTP |
 | `SMTP_PASSWORD` | нет | — | Пароль SMTP |
 | `SMTP_FROM` | нет | `SMTP_USER` | Отправитель писем |
-| `FRONTEND_URL` | нет | `http://localhost:5173` | Адрес фронтенда для ссылок в письмах |
+| `FRONTEND_URL` | нет | `http://localhost:5173` | Адрес фронтенда для ссылок в письмах и публичных QR-ссылок |
 
 ## API
 
@@ -69,6 +70,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 - `/vehicles` — создание, получение, обновление, мягкое/полное удаление, восстановление, пробег, интервалы, уведомления
 - `/replacements` — создание (в т.ч. bulk), получение, обновление, удаление замен
 - `/enums/*` — справочники марок, моделей, компонентов и их конфигураций
+- `/vehicles/{id}/share` — управление публичной ссылкой (GET/POST/DELETE, `share/rotate`)
+- `/public/vehicles/{token}` — публичный профиль авто с историей замен (без авторизации)
 
 ## Тесты и качество
 

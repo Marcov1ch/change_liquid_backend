@@ -71,11 +71,24 @@ class ReplacementResponse(ReplacementBase):
 
 class UpdateReplacementRequest(BaseModel):
     """Обновление записи о замене (тип компонента не изменяем)."""
-    component_name: str | None = Field(None, min_length=1, max_length=100)
-    component_price: int | None = Field(None, ge=0)
-    work_price: int | None = Field(None, ge=0)
+    component_name: str | None = Field(
+        None,
+        min_length=1,
+        max_length=100,
+    )
+    component_price: int | None = Field(
+        None,
+        ge=0,
+    )
+    work_price: int | None = Field(
+        None,
+        ge=0,
+    )
     replacement_date: date | None = None
-    km_at_replacement: int | None = Field(None, ge=0)
+    km_at_replacement: int | None = Field(
+        None,
+        ge=0,
+    )
     next_change_date: date | None = None
 
 

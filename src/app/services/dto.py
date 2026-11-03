@@ -17,6 +17,7 @@ class VehicleDTO:
     current_km: int
     is_active: bool
     owner_id: int
+    share_token: str | None = None
     intervals: dict[str, int] = field(default_factory=dict)
     notify_flags: dict[str, bool] = field(default_factory=dict)
     interval_months: dict[str, int | None] = field(default_factory=dict)

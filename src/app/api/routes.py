@@ -3,6 +3,7 @@ from fastapi import FastAPI, APIRouter
 from app.api.vehicle.handler import vehicle_handler
 from app.api.replacement.handler import replacement_handler
 from app.api.enums.handler import enums_handler
+from app.api.share.handler import share_handler
 
 
 def setup_routes(app: FastAPI) -> None:
@@ -107,6 +108,38 @@ def setup_routes(app: FastAPI) -> None:
         replacement_handler.create_replacements,
         methods=["POST"],
         tags=["replacements"]
+    )
+
+    # Маршруты для публичного шаринга
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/share",
+        share_handler.get_share,
+        methods=["GET"],
+        tags=["share"]
+    )
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/share",
+        share_handler.enable_share,
+        methods=["POST"],
+        tags=["share"]
+    )
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/share/rotate",
+        share_handler.rotate_share,
+        methods=["POST"],
+        tags=["share"]
+    )
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/share",
+        share_handler.disable_share,
+        methods=["DELETE"],
+        tags=["share"]
+    )
+    router.add_api_route(
+        "/public/vehicles/{token}",
+        share_handler.get_public_vehicle,
+        methods=["GET"],
+        tags=["public"]
     )
 
     # Маршруты для получения enum

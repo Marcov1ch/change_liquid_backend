@@ -65,6 +65,7 @@ class VehicleRepository:
             current_km=db_vehicle.current_km,
             is_active=db_vehicle.is_active,
             owner_id=db_vehicle.owner_id,
+            share_token=db_vehicle.share_token,
             intervals=intervals,
             notify_flags=notify_flags,
             interval_months=interval_months,
@@ -130,6 +131,20 @@ class VehicleRepository:
         """Найти авто по id (включая удаленные)."""
         db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
         return self._to_dto(db_vehicle) if db_vehicle else None
+
+    def find_by_share_token(self, token: str) -> VehicleDTO | None:
+        """Найти авто по публичному токену."""
+        db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.share_token == token).first()
+        return self._to_dto(db_vehicle) if db_vehicle else None
+
+    def set_share_token(self, vehicle_id: int, token: str | None) -> bool:
+        """Установить или очистить публичный токен авто."""
+        db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
+        if not db_vehicle:
+            return False
+        db_vehicle.share_token = token
+        self.db.commit()
+        return True
 
     def find_active(self) -> list[VehicleDTO]:
         """Получить все активные авто."""

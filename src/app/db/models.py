@@ -57,6 +57,7 @@ class VehicleDB(Base):  # type: ignore
     current_km = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    share_token = Column(String, unique=True, nullable=True, index=True)
 
     # defaults управляются app.common.component_config COMPONENTS_CONFIG
     oil_interval_km = Column(Integer)
