@@ -1,0 +1,151 @@
+import logging
+
+from fastapi import Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.api.replacement.mapper import build_replacement_response
+from app.api.share.schema import (
+    PublicReplacementResponse,
+    PublicVehicleResponse,
+    ShareLinkResponse,
+)
+from app.common.config import build_register_url, build_share_url
+from app.common.middleware import verify_vehicle_view_access
+from app.common.utils.calculator import StatusCalculator
+from app.db.database import get_db
+from app.services.dto import VehicleDTO
+from app.services.replacement_service import ReplacementService
+from app.services.share_service import VehicleShareService
+
+logger = logging.getLogger(__name__)
+
+_MSG_SHARE_NOT_FOUND = 'Ссылка не найдена или отключена'
+
+
+class ShareHandler:
+    """Хэндлер публичного шаринга авто."""
+
+    @staticmethod
+    def _link_response(token: str | None) -> ShareLinkResponse:
+        return ShareLinkResponse(
+            enabled=token is not None,
+            token=token,
+            share_url=build_share_url(token) if token else None,
+            register_url=build_register_url(),
+        )
+
+    async def get_share(
+        self,
+        db: Session = Depends(get_db),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
+    ) -> ShareLinkResponse:
+        """Получить состояние публичной ссылки."""
+        share_service = VehicleShareService(db)
+        return self._link_response(share_service.get_token(vehicle.id))
+
+    async def enable_share(
+        self,
+        db: Session = Depends(get_db),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
+    ) -> ShareLinkResponse:
+        """Включить публичный доступ и вернуть ссылку."""
+        share_service = VehicleShareService(db)
+
+        try:
+            token = share_service.enable(vehicle.id)
+            return self._link_response(token)
+        except Exception:
+            logger.exception('Failed to enable vehicle share')
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Не удалось включить публичный доступ',
+            )
+
+    async def rotate_share(
+        self,
+        db: Session = Depends(get_db),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
+    ) -> ShareLinkResponse:
+        """Перевыпустить публичную ссылку."""
+        share_service = VehicleShareService(db)
+
+        try:
+            token = share_service.rotate(vehicle.id)
+            return self._link_response(token)
+        except Exception:
+            logger.exception('Failed to rotate vehicle share')
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Не удалось обновить публичную ссылку',
+            )
+
+    async def disable_share(
+        self,
+        db: Session = Depends(get_db),
+        vehicle: VehicleDTO = Depends(verify_vehicle_view_access),
+    ) -> ShareLinkResponse:
+        """Отключить публичный доступ."""
+        share_service = VehicleShareService(db)
+
+        try:
+            share_service.disable(vehicle.id)
+            return self._link_response(None)
+        except Exception:
+            logger.exception('Failed to disable vehicle share')
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Не удалось отключить публичный доступ',
+            )
+
+    async def get_public_vehicle(
+        self,
+        token: str,
+        db: Session = Depends(get_db),
+    ) -> PublicVehicleResponse:
+        """Получить публичный профиль авто по токену."""
+        share_service = VehicleShareService(db)
+
+        try:
+            vehicle = share_service.find_by_token(token)
+            if not vehicle:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=_MSG_SHARE_NOT_FOUND,
+                )
+
+            replacement_service = ReplacementService(db)
+            replacements = replacement_service.get_by_vehicle(vehicle.id)
+            latest_ids = replacement_service.get_latest_replacement_ids(vehicle.id)
+
+            public_replacements = [
+                PublicReplacementResponse(
+                    **build_replacement_response(
+                        replacement,
+                        vehicle,
+                        is_latest=replacement.id in latest_ids,
+                    ).model_dump(exclude={'vehicle_id'}),
+                )
+                for replacement in replacements
+            ]
+
+            return PublicVehicleResponse(
+                brand=vehicle.brand,
+                model=vehicle.model,
+                plate_number=vehicle.plate_number,
+                year=vehicle.year,
+                current_km=vehicle.current_km,
+                vehicle_status=StatusCalculator.get_vehicle_status(vehicle, replacements),
+                replacements=public_replacements,
+                register_url=build_register_url(),
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception('Failed to get public vehicle')
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Не удалось получить данные автомобиля',
+            )
+
+
+share_handler = ShareHandler()

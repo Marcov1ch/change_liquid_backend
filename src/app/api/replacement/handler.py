@@ -4,6 +4,7 @@ from typing import List
 from fastapi import HTTPException, status, Depends, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 
+from app.api.replacement.mapper import build_replacement_response
 from app.api.replacement.schema import (
     ReplacementResponse,
     UpdateReplacementRequest,
@@ -19,9 +20,6 @@ from app.common.middleware import (
     verify_replacement_access,
     verify_replacement_view_access,
 )
-from app.common.enums import StatusEnum, ComponentType
-from app.common.utils.calculator import StatusCalculator
-from app.common.utils.interval_utils import add_months
 from app.services.notification_service import check_vehicle_notifications_background
 
 logger = logging.getLogger(__name__)
@@ -37,80 +35,7 @@ class ReplacementHandler:
         is_latest: bool = True,
     ) -> ReplacementResponse:
         """Преобразовать DTO в Response с расчётом статуса."""
-        is_tire = replacement_dto.component_type == ComponentType.TIRE_CHANGE
-
-        if not is_latest:
-            next_change_date = replacement_dto.next_change_date if is_tire else None
-            return ReplacementResponse(
-                id=replacement_dto.id,
-                vehicle_id=replacement_dto.vehicle_id,
-                component_type=replacement_dto.component_type,
-                component_name=replacement_dto.component_name,
-                component_price=replacement_dto.component_price,
-                work_price=replacement_dto.work_price,
-                replacement_date=replacement_dto.replacement_date,
-                km_at_replacement=replacement_dto.km_at_replacement,
-                interval_km=replacement_dto.interval_km,
-                next_replacement_km=None,
-                km_remaining=None,
-                next_change_date=next_change_date,
-                days_remaining=None,
-                status=StatusEnum.REPLACED.value,
-            )
-
-        if is_tire:
-            status_data = StatusCalculator.calculate_date_status(
-                replacement_dto.next_change_date,
-            )
-            return ReplacementResponse(
-                id=replacement_dto.id,
-                vehicle_id=replacement_dto.vehicle_id,
-                component_type=replacement_dto.component_type,
-                component_name=replacement_dto.component_name,
-                component_price=replacement_dto.component_price,
-                work_price=replacement_dto.work_price,
-                replacement_date=replacement_dto.replacement_date,
-                km_at_replacement=replacement_dto.km_at_replacement,
-                interval_km=replacement_dto.interval_km,
-                next_replacement_km=0,
-                km_remaining=0,
-                next_change_date=status_data["next_change_date"],
-                days_remaining=status_data["days_remaining"],
-                status=status_data["status"],
-            )
-
-        interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
-        status_data = StatusCalculator.calculate_status(
-            km_at_replacement=replacement_dto.km_at_replacement,
-            interval_km=interval,
-            current_km=vehicle.current_km,
-        )
-
-        next_change_date = None
-        days_remaining = None
-        months = vehicle.interval_months.get(replacement_dto.component_type.value)
-        if months is not None:
-            next_change_date = add_months(replacement_dto.replacement_date, months)
-            date_result = StatusCalculator.calculate_date_status(next_change_date)
-            next_change_date = date_result["next_change_date"]
-            days_remaining = date_result["days_remaining"]
-
-        return ReplacementResponse(
-            id=replacement_dto.id,
-            vehicle_id=replacement_dto.vehicle_id,
-            component_type=replacement_dto.component_type,
-            component_name=replacement_dto.component_name,
-            component_price=replacement_dto.component_price,
-            work_price=replacement_dto.work_price,
-            replacement_date=replacement_dto.replacement_date,
-            km_at_replacement=replacement_dto.km_at_replacement,
-            interval_km=replacement_dto.interval_km,
-            next_replacement_km=status_data["next_replacement_km"],
-            km_remaining=status_data["km_remaining"],
-            next_change_date=next_change_date,
-            days_remaining=days_remaining,
-            status=status_data["status"],
-        )
+        return build_replacement_response(replacement_dto, vehicle, is_latest=is_latest)
 
     async def create_replacements(
         self,
@@ -131,7 +56,7 @@ class ReplacementHandler:
                     vehicle,
                     commit=False,
                 )
-                results.append(self._to_response(replacement_dto, vehicle))
+                results.append(build_replacement_response(replacement_dto, vehicle))
 
             db.commit()
             background_tasks.add_task(
@@ -175,7 +100,7 @@ class ReplacementHandler:
             )
 
             return [
-                self._to_response(replacement, vehicle, is_latest=replacement.id in latest_ids)
+                build_replacement_response(replacement, vehicle, is_latest=replacement.id in latest_ids)
                 for replacement in replacements_dto
             ]
         except HTTPException:
@@ -197,7 +122,7 @@ class ReplacementHandler:
 
         try:
             vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
-            return self._to_response(replacement, vehicle)
+            return build_replacement_response(replacement, vehicle)
         except HTTPException:
             raise
         except Exception:
@@ -229,7 +154,7 @@ class ReplacementHandler:
                 replacement_dto.vehicle_id,
             )
 
-            return self._to_response(replacement_dto, vehicle)
+            return build_replacement_response(replacement_dto, vehicle)
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
