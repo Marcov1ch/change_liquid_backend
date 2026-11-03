@@ -33,9 +33,15 @@ class ReplacementHandler:
         replacement_dto: ReplacementDTO,
         vehicle: VehicleDTO,
         is_latest: bool = True,
+        km_traveled: int | None = None,
     ) -> ReplacementResponse:
         """Преобразовать DTO в Response с расчётом статуса."""
-        return build_replacement_response(replacement_dto, vehicle, is_latest=is_latest)
+        return build_replacement_response(
+            replacement_dto,
+            vehicle,
+            is_latest=is_latest,
+            km_traveled=km_traveled,
+        )
 
     async def create_replacements(
         self,
@@ -48,17 +54,26 @@ class ReplacementHandler:
         replacement_service = ReplacementService(db)
 
         try:
-            results = []
+            created = []
             for replacement_request in request.replacements:
-                replacement_dto = replacement_service.create(
+                created.append(replacement_service.create(
                     vehicle.id,
                     replacement_request,
                     vehicle,
                     commit=False,
-                )
-                results.append(build_replacement_response(replacement_dto, vehicle))
+                ))
 
             db.commit()
+            km_traveled = replacement_service.get_tire_km_traveled(vehicle.id, vehicle.current_km)
+            results = [
+                build_replacement_response(
+                    replacement_dto,
+                    vehicle,
+                    km_traveled=km_traveled.get(replacement_dto.id or 0),
+                )
+                for replacement_dto in created
+            ]
+
             background_tasks.add_task(
                 check_vehicle_notifications_background,
                 vehicle.id,
@@ -98,9 +113,15 @@ class ReplacementHandler:
                 limit=limit,
                 offset=offset,
             )
+            km_traveled = replacement_service.get_tire_km_traveled(vehicle.id, vehicle.current_km)
 
             return [
-                build_replacement_response(replacement, vehicle, is_latest=replacement.id in latest_ids)
+                build_replacement_response(
+                    replacement,
+                    vehicle,
+                    is_latest=replacement.id in latest_ids,
+                    km_traveled=km_traveled.get(replacement.id or 0),
+                )
                 for replacement in replacements_dto
             ]
         except HTTPException:
@@ -118,11 +139,17 @@ class ReplacementHandler:
         replacement: ReplacementDTO = Depends(verify_replacement_view_access),
     ) -> ReplacementResponse:
         """Получить конкретную замену по ID."""
+        replacement_service = ReplacementService(db)
         vehicle_service = VehicleService(db)
 
         try:
             vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
-            return build_replacement_response(replacement, vehicle)
+            km_traveled = replacement_service.get_tire_km_traveled(vehicle.id, vehicle.current_km)
+            return build_replacement_response(
+                replacement,
+                vehicle,
+                km_traveled=km_traveled.get(replacement.id or 0),
+            )
         except HTTPException:
             raise
         except Exception:
@@ -148,13 +175,19 @@ class ReplacementHandler:
 
             update_data = request.model_dump(exclude_none=True)
             replacement_dto = replacement_service.update(replacement.id, **update_data)
+            vehicle = vehicle_service.get_by_id(replacement_dto.vehicle_id)
+            km_traveled = replacement_service.get_tire_km_traveled(vehicle.id, vehicle.current_km)
 
             background_tasks.add_task(
                 check_vehicle_notifications_background,
                 replacement_dto.vehicle_id,
             )
 
-            return build_replacement_response(replacement_dto, vehicle)
+            return build_replacement_response(
+                replacement_dto,
+                vehicle,
+                km_traveled=km_traveled.get(replacement_dto.id or 0),
+            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

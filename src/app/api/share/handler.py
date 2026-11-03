@@ -116,6 +116,7 @@ class ShareHandler:
             replacement_service = ReplacementService(db)
             replacements = replacement_service.get_by_vehicle(vehicle.id)
             latest_ids = replacement_service.get_latest_replacement_ids(vehicle.id)
+            km_traveled = replacement_service.get_tire_km_traveled(vehicle.id, vehicle.current_km)
 
             public_replacements = [
                 PublicReplacementResponse(
@@ -123,6 +124,7 @@ class ShareHandler:
                         replacement,
                         vehicle,
                         is_latest=replacement.id in latest_ids,
+                        km_traveled=km_traveled.get(replacement.id or 0),
                     ).model_dump(exclude={'vehicle_id'}),
                 )
                 for replacement in replacements

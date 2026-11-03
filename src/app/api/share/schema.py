@@ -67,6 +67,10 @@ class PublicReplacementResponse(BaseModel):
         None,
         description='Остаток км до замены',
     )
+    km_traveled: int | None = Field(
+        None,
+        description='Пройдено километров с момента замены (для шин)',
+    )
     next_change_date: date | None = Field(
         None,
         description='Дата следующей замены',
