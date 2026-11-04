@@ -37,6 +37,7 @@ class UserDB(Base):  # type: ignore
     username = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    email_verified = Column(Boolean, nullable=False, default=False, server_default="0")
     is_active = Column(Boolean, default=True)
     token_version = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

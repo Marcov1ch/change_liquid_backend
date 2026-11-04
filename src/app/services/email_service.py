@@ -107,6 +107,23 @@ def send_reset_password_email(to_email: str, token: str) -> None:
     _send_email(to_email, subject, body)
 
 
+def send_verification_email(to_email: str, token: str) -> None:
+    """Отправить письмо для подтверждения email."""
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    verify_link = f"{frontend_url}/verify-email?token={token}"
+
+    subject = "Подтверждение email — Change Liquid"
+    body = f"""
+    <h2>Подтверждение email</h2>
+    <p>Чтобы подтвердить адрес электронной почты, перейдите по ссылке ниже:</p>
+    <p><a href="{verify_link}">{verify_link}</a></p>
+    <p>Ссылка действительна в течение 24 часов.</p>
+    <p>Если вы не регистрировались в Change Liquid, просто проигнорируйте это письмо.</p>
+    """
+
+    _send_email(to_email, subject, body)
+
+
 def send_date_notification_email(
     to_email: str,
     username: str,

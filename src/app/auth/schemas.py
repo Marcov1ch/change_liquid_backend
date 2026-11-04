@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    email_verified: bool
     is_active: bool
     created_at: datetime
 
@@ -67,3 +68,7 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str

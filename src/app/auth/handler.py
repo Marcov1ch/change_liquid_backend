@@ -13,6 +13,7 @@ from app.db.models import UserDB
 from app.auth.password import hash_password, verify_password
 from app.auth.jwt import (
     create_access_token,
+    create_email_verification_token,
     create_refresh_token,
     refresh_access_token,
     get_current_user,
@@ -28,8 +29,9 @@ from app.auth.schemas import (
     MessageResponse,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    VerifyEmailRequest,
 )
-from app.services.email_service import send_reset_password_email
+from app.services.email_service import send_reset_password_email, send_verification_email
 from app.auth.jwt import (
     SECRET_KEY,
     ALGORITHM,
@@ -45,7 +47,11 @@ _RATE_LIMIT_WINDOW_SECONDS = 300
 _RATE_LIMIT_MAX_KEYS = 10000
 _RATE_LIMIT_CLEANUP_SECONDS = 60
 
+_RESEND_VERIFICATION_COOLDOWN_SECONDS = 60
+_RESEND_VERIFICATION_MAX_KEYS = 10000
+
 failed_attempts: defaultdict[str, list[datetime]] = defaultdict(list)
+resend_cooldowns: dict[str, datetime] = {}
 _last_cleanup = time.monotonic()
 
 
@@ -93,6 +99,46 @@ def add_failed_attempt(key: str) -> None:
     failed_attempts[key].append(datetime.now(timezone.utc))
 
 
+def _prune_resend_cooldowns() -> None:
+    """Удалить истёкшие кулдауны повторной отправки письма."""
+    now = datetime.now(timezone.utc)
+    expired = [key for key, until in resend_cooldowns.items() if until <= now]
+    for key in expired:
+        del resend_cooldowns[key]
+
+    while len(resend_cooldowns) > _RESEND_VERIFICATION_MAX_KEYS:
+        resend_cooldowns.pop(next(iter(resend_cooldowns)))
+
+
+def _resend_cooldown_remaining(user_id: int) -> int:
+    """Вернуть оставшееся время кулдауна в секундах."""
+    until = resend_cooldowns.get(str(user_id))
+    if not until:
+        return 0
+    remaining = (until - datetime.now(timezone.utc)).total_seconds()
+    return max(0, int(remaining + 0.999))
+
+
+def _check_resend_cooldown(user_id: int) -> None:
+    """Запретить повторную отправку письма раньше окончания кулдауна."""
+    remaining = _resend_cooldown_remaining(user_id)
+    if remaining > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Повторно отправить письмо можно через {remaining} сек.",
+            headers={"Retry-After": str(remaining)},
+        )
+    _prune_resend_cooldowns()
+
+
+def _mark_verification_sent(user_id: int) -> None:
+    """Запустить кулдаун после отправки письма подтверждения."""
+    resend_cooldowns[str(user_id)] = (
+        datetime.now(timezone.utc)
+        + timedelta(seconds=_RESEND_VERIFICATION_COOLDOWN_SECONDS)
+    )
+
+
 def _send_reset_password_email_safe(to_email: str, token: str) -> None:
     """Отправить письмо восстановления пароля, не роняя фоновую задачу."""
     try:
@@ -101,9 +147,18 @@ def _send_reset_password_email_safe(to_email: str, token: str) -> None:
         logger.exception('Failed to send reset-password email to %s', to_email)
 
 
+def _send_verification_email_safe(to_email: str, token: str) -> None:
+    """Отправить письмо подтверждения email, не роняя фоновую задачу."""
+    try:
+        send_verification_email(to_email=to_email, token=token)
+    except Exception:
+        logger.exception('Failed to send verification email to %s', to_email)
+
+
 @router.post("/register", response_model=UserResponse)
 async def register(
     user_data: UserCreate,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
 ) -> UserResponse:
     """Регистрация нового пользователя."""
@@ -122,6 +177,7 @@ async def register(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed,
+        email_verified=False,
         is_active=True,
         created_at=datetime.now(timezone.utc)
     )
@@ -130,10 +186,19 @@ async def register(
     db.commit()
     db.refresh(new_user)
 
+    verification_token = create_email_verification_token(new_user.id, new_user.email)
+    background_tasks.add_task(
+        _send_verification_email_safe,
+        to_email=new_user.email,
+        token=verification_token,
+    )
+    _mark_verification_sent(new_user.id)
+
     return UserResponse(
         id=new_user.id,
         username=new_user.username,
         email=new_user.email,
+        email_verified=new_user.email_verified,
         is_active=new_user.is_active,
         created_at=new_user.created_at
     )
@@ -210,18 +275,93 @@ async def get_me(current_user: UserDB = Depends(get_current_user)) -> UserRespon
         id=current_user.id,
         username=current_user.username,
         email=current_user.email,
+        email_verified=current_user.email_verified,
         is_active=current_user.is_active,
         created_at=current_user.created_at
     )
 
 
+@router.post("/verify-email", response_model=MessageResponse)
+async def verify_email(
+    request: VerifyEmailRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Подтвердить email по токену из письма."""
+    try:
+        payload = verify_token(request.token, "email_verification")
+        user_id_raw = payload.get("sub")
+        email = payload.get("email")
+        if not user_id_raw or not email:
+            raise ValueError("invalid payload")
+        user_id = int(user_id_raw)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Недействительный или просроченный токен",
+        )
+
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Пользователь не найден",
+        )
+
+    if user.email != email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ссылка недействительна: email был изменён",
+        )
+
+    if not user.email_verified:
+        user.email_verified = True
+        db.commit()
+
+    return MessageResponse(detail="Email подтверждён")
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+async def resend_verification(
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_user: UserDB = Depends(get_current_user),
+) -> MessageResponse:
+    """Повторно отправить письмо подтверждения email."""
+    if current_user.email_verified:
+        return MessageResponse(detail="Email уже подтверждён")
+
+    _check_resend_cooldown(current_user.id)
+
+    verification_token = create_email_verification_token(current_user.id, current_user.email)
+    background_tasks.add_task(
+        _send_verification_email_safe,
+        to_email=current_user.email,
+        token=verification_token,
+    )
+    _mark_verification_sent(current_user.id)
+
+    return MessageResponse(detail="Письмо с подтверждением отправлено")
+
+
 @router.patch("/email", response_model=UserResponse)
 async def update_email(
     request: UpdateEmailRequest,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user),
 ) -> UserResponse:
     """Сменить email текущего пользователя."""
+    if request.email == current_user.email:
+        return UserResponse(
+            id=current_user.id,
+            username=current_user.username,
+            email=current_user.email,
+            email_verified=current_user.email_verified,
+            is_active=current_user.is_active,
+            created_at=current_user.created_at
+        )
+
     existing = db.query(UserDB).filter(
         UserDB.email == request.email,
         UserDB.id != current_user.id,
@@ -234,14 +374,23 @@ async def update_email(
         )
 
     current_user.email = request.email
-    current_user.token_version += 1
+    current_user.email_verified = False
     db.commit()
     db.refresh(current_user)
+
+    verification_token = create_email_verification_token(current_user.id, current_user.email)
+    background_tasks.add_task(
+        _send_verification_email_safe,
+        to_email=current_user.email,
+        token=verification_token,
+    )
+    _mark_verification_sent(current_user.id)
 
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
         email=current_user.email,
+        email_verified=current_user.email_verified,
         is_active=current_user.is_active,
         created_at=current_user.created_at
     )
@@ -298,7 +447,7 @@ async def forgot_password(
         UserDB.email == request.email,
     ).first()
 
-    if not user:
+    if not user or not user.email_verified:
         return MessageResponse(
             detail="Если такой email зарегистрирован, письмо отправлено"
         )

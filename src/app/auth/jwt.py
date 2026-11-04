@@ -16,8 +16,21 @@ if not SECRET_KEY:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 14
+EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS = 24
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+def create_email_verification_token(user_id: int, email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS)
+    to_encode = {
+        "sub": str(user_id),
+        "email": email,
+        "exp": expire,
+        "type": "email_verification",
+    }
+    token: str = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return token
 
 
 def create_access_token(data: dict, version: int = 0) -> str:
