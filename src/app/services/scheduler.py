@@ -86,6 +86,9 @@ def _check_date_notifications() -> None:
                         )
                     continue
 
+                if not vehicle.get("owner_email_verified"):
+                    continue
+
                 try:
                     send_date_notification_email(
                         to_email=vehicle["owner_email"],

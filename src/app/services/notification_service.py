@@ -47,6 +47,9 @@ def _send_grouped(
     if not to_email:
         return
 
+    if not vehicle.get("owner_email_verified"):
+        return
+
     items = [
         ComponentNotificationItem(
             component_name=COMPONENT_NAMES[p.comp_key],

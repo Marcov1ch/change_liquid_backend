@@ -262,6 +262,7 @@ class VehicleRepository:
             "interval_months": interval_months,
             "notify_flags": notify_flags,
             "owner_email": v.owner.email if v.owner else "",
+            "owner_email_verified": bool(v.owner.email_verified) if v.owner else False,
             "owner_username": v.owner.username if v.owner else "",
         }
 
