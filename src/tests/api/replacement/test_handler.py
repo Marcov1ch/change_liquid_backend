@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from app.api.replacement.handler import ReplacementHandler
 from app.common.enums import ComponentType, StatusEnum
@@ -81,3 +81,37 @@ def test_tire_km_traveled_uses_passed_value() -> None:
         km_traveled=2500,
     )
     assert response.km_traveled == 2500
+
+
+def test_latest_insurance_uses_date_status_and_hides_mileage() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.INSURANCE)
+    replacement.km_at_replacement = 0
+    replacement.interval_km = 0
+    replacement.work_price = None
+    replacement.next_change_date = date.today() + timedelta(days=30)
+
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=True)
+
+    assert response.status == StatusEnum.GOOD
+    assert response.next_change_date == replacement.next_change_date
+    assert response.days_remaining == 30
+    assert response.next_replacement_km is None
+    assert response.km_remaining is None
+    assert response.km_traveled is None
+    assert response.work_price is None
+
+
+def test_archival_insurance_keeps_stored_date() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.INSURANCE)
+    replacement.km_at_replacement = 0
+    replacement.interval_km = 0
+    replacement.next_change_date = date(2026, 11, 1)
+
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=False)
+
+    assert response.next_change_date == date(2026, 11, 1)
+    assert response.status == StatusEnum.REPLACED
+    assert response.km_remaining is None
+    assert response.km_traveled is None

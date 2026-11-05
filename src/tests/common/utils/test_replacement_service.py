@@ -167,6 +167,60 @@ def test_create_computes_next_change_date_from_vehicle_months(
     assert result.interval_months == 12
 
 
+def test_create_insurance_requires_next_change_date(vehicle_dto: VehicleDTO) -> None:
+    request = MagicMock()
+    request.component_type = ComponentType.INSURANCE
+    request.next_change_date = None
+
+    service = ReplacementService.__new__(ReplacementService)
+    service.repository = MagicMock()
+    service.vehicle_repository = MagicMock()
+
+    with pytest.raises(ValueError, match='дату окончания'):
+        service.create(1, request, vehicle_dto)
+
+    service.repository.save.assert_not_called()
+
+
+def test_create_insurance_stores_zero_km_and_no_work_price(vehicle_dto: VehicleDTO) -> None:
+    request = MagicMock()
+    request.component_type = ComponentType.INSURANCE
+    request.km_at_replacement = 999
+    request.component_name = 'ОСАГО'
+    request.replacement_date = date(2026, 1, 15)
+    request.component_price = 12000
+    request.work_price = 500
+    request.next_change_date = date(2027, 1, 15)
+
+    saved = ReplacementDTO(
+        id=2, vehicle_id=1,
+        component_type=ComponentType.INSURANCE,
+        component_name='ОСАГО',
+        component_price=12000,
+        work_price=None,
+        replacement_date=date(2026, 1, 15),
+        km_at_replacement=0,
+        interval_km=0,
+        next_change_date=date(2027, 1, 15),
+    )
+
+    service = ReplacementService.__new__(ReplacementService)
+    service.repository = MagicMock()
+    service.repository.save.return_value = saved
+    service.vehicle_repository = MagicMock()
+
+    result = service.create(1, request, vehicle_dto, commit=False)
+
+    assert result is saved
+    created = service.repository.save.call_args.args[0]
+    assert created.km_at_replacement == 0
+    assert created.interval_km == 0
+    assert created.interval_months is None
+    assert created.work_price is None
+    assert created.next_change_date == date(2027, 1, 15)
+    service.repository.find_by_vehicle_component_and_km.assert_not_called()
+
+
 def test_get_tire_km_traveled_counts_between_records() -> None:
     first = ReplacementDTO(
         id=1, vehicle_id=1,

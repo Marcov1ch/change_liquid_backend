@@ -13,6 +13,16 @@ def test_tire_uses_stored_date() -> None:
     assert _resolve_next_change_date(vehicle, last) == date(2026, 11, 1)
 
 
+def test_insurance_uses_stored_date() -> None:
+    vehicle = {"interval_months": {}}
+    last = {
+        "component_type": "insurance",
+        "replacement_date": date(2026, 1, 1),
+        "next_change_date": date(2027, 1, 1),
+    }
+    assert _resolve_next_change_date(vehicle, last) == date(2027, 1, 1)
+
+
 def test_non_tire_computed_from_vehicle_months() -> None:
     vehicle = {"interval_months": {"engine_oil": 13}}
     last = {

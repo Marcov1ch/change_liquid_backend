@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.db.models import ReplacementDB
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS
 from app.services.dto import ReplacementDTO
 
 
@@ -175,7 +175,10 @@ class ReplacementRepository:
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
             ReplacementDB.component_type == component_type.value
-        ).order_by(ReplacementDB.km_at_replacement.desc()).first()
+        ).order_by(
+            ReplacementDB.km_at_replacement.desc(),
+            ReplacementDB.id.desc(),
+        ).first()
 
         if not db_replacement:
             return None
@@ -241,7 +244,10 @@ class ReplacementRepository:
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
             ReplacementDB.component_type == component_type.value
-        ).order_by(ReplacementDB.km_at_replacement.desc()).first()
+        ).order_by(
+            ReplacementDB.km_at_replacement.desc(),
+            ReplacementDB.id.desc(),
+        ).first()
 
         if not db_replacement:
             return None
@@ -347,10 +353,10 @@ class ReplacementRepository:
             self.db.commit()
 
     def reset_date_notify_flags(self, vehicle_id: int, commit: bool = True) -> int:
-        """Сбросить флаги date-уведомлений у non-tire замен автомобиля."""
+        """Сбросить флаги date-уведомлений у non-date-based замен автомобиля."""
         count = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
-            ReplacementDB.component_type != ComponentType.TIRE_CHANGE.value,
+            ReplacementDB.component_type.notin_(list(DATE_BASED_COMPONENT_KEYS)),
         ).update({
             ReplacementDB.date_warning_notified: False,
             ReplacementDB.date_overdue_notified: False,

@@ -3,7 +3,7 @@ import pytest
 from datetime import date
 from typing import Any
 
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES
 from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
 from app.services.dto import VehicleDTO
 
@@ -48,7 +48,7 @@ def test_get_interval_for_component(
     assert ComponentIntervalUtils.get_interval_for_component(vehicle, component_type) == expected
 
 
-ALL_COMPONENTS = [c for c in ComponentType if c != ComponentType.TIRE_CHANGE]
+ALL_COMPONENTS = [c for c in ComponentType if c not in DATE_BASED_COMPONENT_TYPES]
 
 
 @pytest.mark.parametrize(

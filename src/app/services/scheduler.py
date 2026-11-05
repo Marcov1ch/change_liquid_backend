@@ -6,7 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.common.constants import DATE_WARNING_DAYS
 from app.common.component_config import COMPONENTS_CONFIG
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS
 from app.common.utils.interval_utils import add_months
 from app.db.database import SessionLocal
 from app.repository.replacement_repository import ReplacementRepository
@@ -24,7 +24,7 @@ def _resolve_next_change_date(
 ) -> date | None:
     """Определить дату следующей замены из настроек авто (или сохранённую для шин)."""
     comp_key: str = last_repl["component_type"]
-    if comp_key == ComponentType.TIRE_CHANGE.value:
+    if comp_key in DATE_BASED_COMPONENT_KEYS:
         stored_date: date | None = last_repl.get("next_change_date")
         return stored_date
 
@@ -45,8 +45,8 @@ def _check_date_notifications() -> None:
 
         vehicles = vehicle_repo.find_all_active_with_owner()
 
-        # Пробегаемся по настраиваемым компонентам + шинам
-        comp_keys = [cfg.type.value for cfg in COMPONENTS_CONFIG] + [ComponentType.TIRE_CHANGE.value]
+        # Пробегаемся по настраиваемым компонентам + date-based типам
+        comp_keys = [cfg.type.value for cfg in COMPONENTS_CONFIG] + list(DATE_BASED_COMPONENT_KEYS)
 
         for vehicle in vehicles:
             notify_flags = vehicle["notify_flags"]
