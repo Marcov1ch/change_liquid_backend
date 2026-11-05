@@ -1,7 +1,5 @@
 from sqlalchemy.orm import Session
 
-from app.common.constants import MSG_PLATE_NUMBER_EXISTS
-from app.common.exceptions import VehicleConflictError
 from app.common.schemas.base_vehicle import VehicleBase
 from app.repository.enum_repository import EnumRepository
 from app.repository.vehicle_repository import VehicleRepository
@@ -58,10 +56,6 @@ class VehicleService:
 
         return self.repository.save(dto)
 
-    def get_by_plate_number(self, plate_number: str) -> VehicleDTO | None:
-        """Получить авто по Рег. номеру."""
-        return self.repository.find_by_plate_number(plate_number)
-
     def get_all_active(self) -> list[VehicleDTO]:
         """Получить все активные авто."""
         return self.repository.find_active()  # type: ignore[no-any-return]
@@ -100,22 +94,12 @@ class VehicleService:
         """Обновить данные авто."""
         return self.repository.save(dto)
 
-    def _ensure_plate_number_available(self, vehicle_id: int, plate_number: str) -> None:
-        """Проверить, что госномер не занят другим авто."""
-        existing = self.repository.find_by_plate_number(plate_number)
-        if existing and existing.id != vehicle_id:
-            raise VehicleConflictError(
-                MSG_PLATE_NUMBER_EXISTS.format(plate_number=plate_number)
-            )
-
     def partial_update(self, dto: VehicleDTO, data: dict) -> VehicleDTO:
         """Применить частичное обновление авто по словарю изменённых полей."""
         if 'brand' in data or 'model' in data:
             self.update_brand_model(dto, data.get('brand'), data.get('model'))
 
         if 'plate_number' in data:
-            if dto.id is not None:
-                self._ensure_plate_number_available(dto.id, data['plate_number'])
             dto.plate_number = data['plate_number']
 
         if 'year' in data:

@@ -126,11 +126,6 @@ class VehicleRepository:
 
         return self._to_dto(db_vehicle)
 
-    def find_by_plate_number(self, plate_number: str) -> VehicleDTO | None:
-        """Найти авто по Рег. номеру."""
-        db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.plate_number == plate_number).first()
-        return self._to_dto(db_vehicle) if db_vehicle else None
-
     def find_by_id(self, vehicle_id: int) -> VehicleDTO | None:
         """Найти авто по id (включая удаленные)."""
         db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()

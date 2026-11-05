@@ -7,7 +7,6 @@ from starlette import status
 
 from app.api.vehicle.handler import VehicleHandler
 from app.api.vehicle.schema import UpdateVehicleData
-from app.common.exceptions import VehicleConflictError
 from app.services.dto import VehicleDTO
 from app.services.notification_service import check_vehicle_notifications_background
 
@@ -85,25 +84,6 @@ def test_update_vehicle_schedules_notification_on_km_change() -> None:
     assert len(tasks.tasks) == 1
     assert tasks.tasks[0].func is check_vehicle_notifications_background
     assert tasks.tasks[0].args == (1,)
-
-
-def test_update_vehicle_maps_conflict_to_409() -> None:
-    with patch('app.api.vehicle.handler.VehicleService') as vehicle_service_cls:
-        vehicle_service_cls.return_value.partial_update.side_effect = VehicleConflictError(
-            'занят'
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(
-                VehicleHandler().update_vehicle(
-                    request=UpdateVehicleData(plate_number='В456ВВ178'),
-                    background_tasks=BackgroundTasks(),
-                    db=MagicMock(),
-                    vehicle=_vehicle(),
-                )
-            )
-
-    assert exc_info.value.status_code == status.HTTP_409_CONFLICT
 
 
 def test_update_vehicle_maps_validation_to_400() -> None:

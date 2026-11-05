@@ -2,7 +2,6 @@ import logging
 
 from fastapi import HTTPException, status, Depends, BackgroundTasks, Query
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.vehicle.schema import (
@@ -16,8 +15,6 @@ from app.api.vehicle.schema import (
 )
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
-from app.common.constants import MSG_PLATE_NUMBER_EXISTS
-from app.common.exceptions import VehicleConflictError
 from app.common.middleware import verify_vehicle_access, verify_vehicle_view_access
 from app.db.database import get_db
 from app.db.models import UserDB
@@ -152,13 +149,6 @@ class VehicleHandler:
         """Создать авто."""
         vehicle_service = VehicleService(db)
         try:
-            existing = vehicle_service.get_by_plate_number(request.plate_number)
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=MSG_PLATE_NUMBER_EXISTS.format(plate_number=request.plate_number),
-                )
-
             vehicle_dto = vehicle_service.create(current_user.id, request)
 
             return self._to_response(vehicle_dto)
@@ -209,11 +199,6 @@ class VehicleHandler:
                 )
 
             return self._to_response(updated_dto)
-        except VehicleConflictError as err:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(err),
-            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -221,17 +206,6 @@ class VehicleHandler:
             )
         except HTTPException:
             raise
-        except IntegrityError:
-            db.rollback()
-            detail = (
-                MSG_PLATE_NUMBER_EXISTS.format(plate_number=payload['plate_number'])
-                if payload.get('plate_number') is not None
-                else 'Автомобиль с такими данными уже существует'
-            )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=detail,
-            )
         except Exception:
             logger.exception('Failed to update vehicle')
             raise HTTPException(
@@ -283,11 +257,6 @@ class VehicleHandler:
         try:
             updated_dto = vehicle_service.partial_update(vehicle, payload)
             return self._to_response(updated_dto)
-        except VehicleConflictError as err:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(err),
-            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -314,11 +283,6 @@ class VehicleHandler:
         try:
             updated_dto = vehicle_service.partial_update(vehicle, payload)
             return self._to_response(updated_dto)
-        except VehicleConflictError as err:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=str(err),
-            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
