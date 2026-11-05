@@ -2,7 +2,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.common.exceptions import VehicleConflictError
 from app.services.dto import VehicleDTO
 from app.services.vehicle_service import VehicleService
 
@@ -45,28 +44,16 @@ def test_partial_update_applies_only_given_fields() -> None:
     assert dto.current_km == 30000
     assert dto.brand == 'VW'
     service.repository.save.assert_called_once_with(dto)
-    service.repository.find_by_plate_number.assert_not_called()
 
 
-def test_partial_update_rejects_plate_number_of_another_vehicle() -> None:
-    service = _service()
-    service.repository.find_by_plate_number.return_value = _vehicle(vehicle_id=2)
-
-    with pytest.raises(VehicleConflictError):
-        service.partial_update(_vehicle(), {'plate_number': 'В456ВВ178'})
-
-    service.repository.save.assert_not_called()
-
-
-def test_partial_update_allows_same_plate_number() -> None:
+def test_partial_update_allows_duplicate_plate_number() -> None:
     service = _service()
     dto = _vehicle()
-    service.repository.find_by_plate_number.return_value = dto
     service.repository.save.return_value = dto
 
-    service.partial_update(dto, {'plate_number': 'А123АА178'})
+    service.partial_update(dto, {'plate_number': 'В456ВВ178'})
 
-    assert dto.plate_number == 'А123АА178'
+    assert dto.plate_number == 'В456ВВ178'
     service.repository.save.assert_called_once_with(dto)
 
 

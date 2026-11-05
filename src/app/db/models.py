@@ -53,7 +53,7 @@ class VehicleDB(Base):  # type: ignore
     id = Column(Integer, primary_key=True, index=True)
     brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False)
     model_id = Column(Integer, ForeignKey("models.id"), nullable=False)
-    plate_number = Column(String, unique=True, nullable=False)
+    plate_number = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
     current_km = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True)
