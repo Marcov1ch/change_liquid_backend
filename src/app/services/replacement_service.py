@@ -1,7 +1,7 @@
 from datetime import date
 from sqlalchemy.orm import Session
 from app.api.replacement.schema import ReplacementCreateRequest
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES
 from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
@@ -15,6 +15,7 @@ _MSG_DATE_LESS_THAN_PREVIOUS = 'Дата ({date}) не может быть ра�
 _MSG_KM_GREATER_THAN_NEXT = 'Пробег ({km}) не может быть больше следующей замены ({next_km})'
 _MSG_DATE_GREATER_THAN_NEXT = 'Дата ({date}) не может быть позже следующей замены ({next_date})'
 _MSG_DUPLICATE_REPLACEMENT = 'Замена с текущим пробегом уже существует'
+_MSG_INSURANCE_DATE_REQUIRED = 'Для страховки необходимо указать дату окончания'
 
 
 class ReplacementService:
@@ -37,9 +38,13 @@ class ReplacementService:
         if not vehicle_dto:
             raise ValueError(_MSG_VEHICLE_NOT_FOUND.format(vehicle_id=vehicle_id))
 
-        is_tire = request.component_type == ComponentType.TIRE_CHANGE
+        is_date_based = request.component_type in DATE_BASED_COMPONENT_TYPES
+        is_insurance = request.component_type == ComponentType.INSURANCE
 
-        if not is_tire:
+        if is_insurance and request.next_change_date is None:
+            raise ValueError(_MSG_INSURANCE_DATE_REQUIRED)
+
+        if not is_date_based:
             self._validate_common(
                 request.km_at_replacement,
                 request.replacement_date,
@@ -57,18 +62,19 @@ class ReplacementService:
                 request.km_at_replacement,
             )
 
+        km_at_replacement = 0 if is_insurance else request.km_at_replacement
         self._update_vehicle_km_if_needed(
             vehicle_dto,
-            request.km_at_replacement,
+            km_at_replacement,
             commit,
         )
 
-        interval_km = (0 if is_tire
+        interval_km = (0 if is_date_based
                        else ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type))
 
         next_change_date = request.next_change_date
         interval_months = None
-        if not is_tire:
+        if not is_date_based:
             interval_months = ComponentIntervalUtils.get_interval_months_for_component(
                 vehicle_dto, request.component_type,
             )
@@ -81,9 +87,9 @@ class ReplacementService:
             component_type=request.component_type,
             component_name=request.component_name,
             component_price=request.component_price,
-            work_price=request.work_price,
+            work_price=None if is_insurance else request.work_price,
             replacement_date=request.replacement_date,
-            km_at_replacement=request.km_at_replacement,
+            km_at_replacement=km_at_replacement,
             interval_km=interval_km,
             interval_months=interval_months,
             next_change_date=next_change_date,
@@ -174,9 +180,20 @@ class ReplacementService:
         if not replacement:
             return None
 
+        is_date_based = replacement.component_type in DATE_BASED_COMPONENT_TYPES
+        is_insurance = replacement.component_type == ComponentType.INSURANCE
+
+        if is_insurance:
+            kwargs.pop('km_at_replacement', None)
+            kwargs.pop('work_price', None)
+
         new_km = kwargs.get('km_at_replacement')
         new_date = kwargs.get('replacement_date')
-        is_tire = replacement.component_type == ComponentType.TIRE_CHANGE
+
+        if is_date_based and 'next_change_date' in kwargs:
+            if kwargs['next_change_date'] != replacement.next_change_date:
+                kwargs['date_warning_notified'] = False
+                kwargs['date_overdue_notified'] = False
 
         vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
 
@@ -184,7 +201,7 @@ class ReplacementService:
             if new_km < 0:
                 raise ValueError('Пробег не может быть отрицательным')
 
-            if not is_tire:
+            if not is_date_based:
                 self._validate_sequence(
                     replacement.vehicle_id,
                     replacement.component_type,
@@ -196,7 +213,7 @@ class ReplacementService:
         if new_date is not None:
             if new_date > date.today():
                 raise ValueError('Дата не может быть в будущем')
-            if not is_tire:
+            if not is_date_based:
                 self._validate_sequence(
                     replacement.vehicle_id,
                     replacement.component_type,
@@ -205,15 +222,14 @@ class ReplacementService:
                     exclude_id=replacement_id,
                 )
 
-            if replacement.component_type != ComponentType.TIRE_CHANGE:
-                if vehicle_dto is not None:
-                    new_next_date = ComponentIntervalUtils.get_next_change_date(
-                        vehicle_dto, replacement.component_type, new_date,
-                    )
-                    if new_next_date != replacement.next_change_date:
-                        kwargs['next_change_date'] = new_next_date
-                        kwargs['date_warning_notified'] = False
-                        kwargs['date_overdue_notified'] = False
+            if not is_date_based and vehicle_dto is not None:
+                new_next_date = ComponentIntervalUtils.get_next_change_date(
+                    vehicle_dto, replacement.component_type, new_date,
+                )
+                if new_next_date != replacement.next_change_date:
+                    kwargs['next_change_date'] = new_next_date
+                    kwargs['date_warning_notified'] = False
+                    kwargs['date_overdue_notified'] = False
 
         for key, value in kwargs.items():
             if value is not None and hasattr(replacement, key):

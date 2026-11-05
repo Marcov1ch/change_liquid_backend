@@ -1,15 +1,15 @@
 import pytest
 
 from app.common.component_config import COMPONENTS_CONFIG, ComponentConfig
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES
 from app.db.models import VehicleDB
 
 CONFIGURED_COMPONENTS = [cfg.type for cfg in COMPONENTS_CONFIG]
 
 
 def test_every_component_type_is_configured() -> None:
-    """Каждый отслеживаемый компонент, кроме шин, описан в COMPONENTS_CONFIG."""
-    expected = {t for t in ComponentType if t != ComponentType.TIRE_CHANGE}
+    """Каждый отслеживаемый компонент, кроме date-based типов, описан в COMPONENTS_CONFIG."""
+    expected = {t for t in ComponentType if t not in DATE_BASED_COMPONENT_TYPES}
     assert set(CONFIGURED_COMPONENTS) == expected
 
 

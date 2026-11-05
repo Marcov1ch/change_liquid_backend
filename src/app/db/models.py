@@ -95,6 +95,7 @@ class VehicleDB(Base):  # type: ignore
     fuel_filter_interval_months = Column(Integer, nullable=True)
 
     tire_notify_enabled = Column(Boolean, default=True)
+    insurance_notify_enabled = Column(Boolean, default=True)
 
     owner = relationship("UserDB", back_populates="vehicles")
     brand_ref = relationship("BrandDB", lazy="joined")

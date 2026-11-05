@@ -29,6 +29,7 @@ class VehicleRepository:
                 months_value = cfg.default_interval_months
             interval_months[cfg.type.value] = months_value
         notify_flags['tire_change'] = bool(getattr(db_vehicle, 'tire_notify_enabled', True))
+        notify_flags['insurance'] = bool(getattr(db_vehicle, 'insurance_notify_enabled', True))
         return intervals, notify_flags, interval_months
 
     @staticmethod
@@ -85,6 +86,9 @@ class VehicleRepository:
         tire_notify = dto.notify_flags.get('tire_change')
         if tire_notify is not None:
             db_vehicle.tire_notify_enabled = tire_notify
+        insurance_notify = dto.notify_flags.get('insurance')
+        if insurance_notify is not None:
+            db_vehicle.insurance_notify_enabled = insurance_notify
 
     def save(self, dto: VehicleDTO, commit: bool = True) -> VehicleDTO:
         """Создать или обновить запись об автомобиле."""

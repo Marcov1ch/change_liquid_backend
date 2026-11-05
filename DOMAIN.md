@@ -28,7 +28,7 @@ km_remaining        = next_replacement_km - current_km
 
 ### Расчёт по дате
 
-`StatusCalculator.calculate_date_status` — используется для шин и date-based компонентов:
+`StatusCalculator.calculate_date_status` — используется для date-based компонентов (шины, страховка):
 
 | Условие (`days_remaining = next_change_date - today`) | Статус |
 |---|---|
@@ -50,7 +50,7 @@ km_remaining        = next_replacement_km - current_km
 `StatusCalculator.get_vehicle_status` — берётся **худший** статус среди последних замен по каждому типу:
 
 1. Нет замен вообще → `unknown`.
-2. Для шин (`tire_change`) статус считается по дате, для остальных — по пробегу (интервал из настроек авто).
+2. Для date-based компонентов (`tire_change`, `insurance`) статус считается по дате, для остальных — по пробегу (интервал из настроек авто).
 3. Приоритет: `overdue` > `critical` > `warning` > `good`.
 4. Если у компонента не задан интервал — компонент пропускается.
 5. Если ни один компонент не `overdue/critical`, но есть `warning` → статус авто `warning`, иначе `good`.
@@ -73,12 +73,14 @@ km_remaining        = next_replacement_km - current_km
 | `air_filter` | Воздушный фильтр | 10000 | 12 |
 | `fuel_filter` | Топливный фильтр | 50000 | 24 |
 | `tire_change` | Замена шин | — | — (только по дате) |
+| `insurance` | Страховка | — | — (только по дате) |
 
-- У **всех** компонентов, кроме `tire_change`, есть **оба** интервала: по пробегу и по месяцам.
+- У **всех** компонентов, кроме date-based (`tire_change`, `insurance`), есть **оба** интервала: по пробегу и по месяцам.
 - `tire_change` — особый тип: его нет в `COMPONENTS_CONFIG`, у него нет интервалов по км/мес. Дата следующей замены (`next_change_date`) задаётся вручную при создании записи, статус считается только по дате. Пробег установки сохраняется в `km_at_replacement`; в ответе отдаётся `km_traveled` — сколько км проехали шины (до следующей записи шин или до текущего пробега авто для последней записи). Уведомлений по пробегу для шин нет.
+- `insurance` — особый тип, также вне `COMPONENTS_CONFIG`, только по дате. При создании `next_change_date` обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость страховки — в `component_price`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомления по пробегу для страховки нет.
 - Интервал по пробегу влияет на статус (`good/warning/...`), интервал по месяцам — на `next_change_date` / `days_remaining`.
 - Интервалы хранятся у автомобиля (колонки `*_interval_km` / `*_interval_months`). Если значение не задано — подставляется дефолт из `COMPONENTS_CONFIG` (см. `VehicleRepository._intervals_and_flags`).
-- Флаги уведомлений также хранятся у автомобиля (`*_notify_enabled`, плюс `tire_notify_enabled`) и переключаются через `PATCH /api/v1/vehicles/{id}/notify`.
+- Флаги уведомлений также хранятся у автомобиля (`*_notify_enabled`, плюс `tire_notify_enabled` и `insurance_notify_enabled`) и переключаются через `PATCH /api/v1/vehicles/{id}/notify`.
 
 ## Уведомления
 
@@ -93,10 +95,10 @@ km_remaining        = next_replacement_km - current_km
 `src/app/services/scheduler.py`, APScheduler `BackgroundScheduler`, cron **ежедневно в 09:00** (`hour=9, minute=0`).
 
 Алгоритм `_check_date_notifications`:
-1. Берёт все активные автомобили, для каждого — настраиваемые компоненты + `tire_change`.
+1. Берёт все активные автомобили, для каждого — настраиваемые компоненты + date-based (`tire_change`, `insurance`).
 2. Пропускает компонент, если его уведомления выключены (`notify_flags`), а также весь автомобиль, если email владельца не подтверждён.
 3. Ищет последнюю замену и вычисляет `next_change_date`:
-   - шины — сохранённая дата `next_change_date`;
+   - date-based (шины, страховка) — сохранённая дата `next_change_date`;
    - остальные — `replacement_date + interval_months` (функция `add_months` с учётом переполнения дней, напр. 31.01 + 1 мес → 28.02).
 4. `days_remaining = next_change_date - today`:
    - `<= 0` → `overdue`, но только если ещё не слали (`date_overdue_notified`);
@@ -126,15 +128,15 @@ km_remaining        = next_replacement_km - current_km
 
 `src/app/services/replacement_service.py`, метод `create`.
 
-Валидация для **не**-шинных компонентов:
+Валидация для компонентов **не** date-based:
 - `km_at_replacement >= 0`, `replacement_date <= сегодня`;
 - **хронология** — пробег и дата новой замены не меньше, чем у предыдущей замены того же компонента (`_validate_sequence`, `get_last_replacement`);
 - **нет дубликата** — для этого компонента ещё нет замены с таким же `km_at_replacement`;
 - если новый пробег больше текущего пробега авто — `current_km` авто обновляется.
 
-Для `tire_change` проверки хронологии и дубликата пропускаются (можно задавать `next_change_date` вручную), но введённый пробег установки сохраняется, и `current_km` авто обновляется, если он больше текущего.
+Для date-based (`tire_change`, `insurance`) проверки хронологии и дубликата пропускаются (можно задавать `next_change_date` вручную). Для шин введённый пробег установки сохраняется, и `current_km` авто обновляется, если он больше текущего. Для страховки `next_change_date` обязательна, пробег и работы не сохраняются (`0`/`None`).
 
-При **обновлении** (`update`) те же проверки выполняются с `exclude_id` и поиском соседей (`find_neighbors`): значение не должно быть меньше предыдущей и больше следующей замены. При изменении даты не-шинной замены пересчитывается `next_change_date` и сбрасываются date-флаги.
+При **обновлении** (`update`) те же проверки выполняются с `exclude_id` и поиском соседей (`find_neighbors`): значение не должно быть меньше предыдущей и больше следующей замены. При изменении даты не-date-based замены пересчитывается `next_change_date` и сбрасываются date-флаги; для date-based при смене `next_change_date` сбрасываются date-флаги.
 
 ### Массовое создание (ТО)
 

@@ -1,5 +1,5 @@
 from app.api.replacement.schema import ReplacementResponse
-from app.common.enums import ComponentType, StatusEnum
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES, StatusEnum
 from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import add_months
 from app.services.dto import ReplacementDTO, VehicleDTO
@@ -13,11 +13,15 @@ def build_replacement_response(
 ) -> ReplacementResponse:
     """Преобразовать DTO замены в ответ с расчётом статуса."""
     is_tire = replacement_dto.component_type == ComponentType.TIRE_CHANGE
+    is_insurance = replacement_dto.component_type == ComponentType.INSURANCE
+    is_date_based = replacement_dto.component_type in DATE_BASED_COMPONENT_TYPES
     if is_tire and km_traveled is None:
         km_traveled = max(0, vehicle.current_km - replacement_dto.km_at_replacement)
+    if not is_tire:
+        km_traveled = None
 
     if not is_latest:
-        next_change_date = replacement_dto.next_change_date if is_tire else None
+        next_change_date = replacement_dto.next_change_date if is_date_based else None
         return ReplacementResponse(
             id=replacement_dto.id,
             vehicle_id=replacement_dto.vehicle_id,
@@ -36,7 +40,7 @@ def build_replacement_response(
             status=StatusEnum.REPLACED.value,
         )
 
-    if is_tire:
+    if is_date_based:
         status_data = StatusCalculator.calculate_date_status(
             replacement_dto.next_change_date,
         )
@@ -50,8 +54,8 @@ def build_replacement_response(
             replacement_date=replacement_dto.replacement_date,
             km_at_replacement=replacement_dto.km_at_replacement,
             interval_km=replacement_dto.interval_km,
-            next_replacement_km=0,
-            km_remaining=0,
+            next_replacement_km=None if is_insurance else 0,
+            km_remaining=None if is_insurance else 0,
             km_traveled=km_traveled,
             next_change_date=status_data["next_change_date"],
             days_remaining=status_data["days_remaining"],

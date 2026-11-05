@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -206,4 +206,22 @@ class TestGetVehicleStatus:
             interval_km=40000,
         )
         result = StatusCalculator.get_vehicle_status(v, [close, fresh])
+        assert result == StatusEnum.WARNING.value
+
+    def test_insurance_status_is_calculated_by_date(self, vehicle: VehicleDTO) -> None:
+        insurance = ReplacementDTO(
+            id=1,
+            vehicle_id=1,
+            component_type=ComponentType.INSURANCE,
+            component_name='ОСАГО',
+            component_price=12000,
+            work_price=None,
+            replacement_date=date.today() - timedelta(days=360),
+            km_at_replacement=0,
+            interval_km=0,
+            next_change_date=date.today() + timedelta(days=3),
+        )
+
+        result = StatusCalculator.get_vehicle_status(vehicle, [insurance])
+
         assert result == StatusEnum.WARNING.value

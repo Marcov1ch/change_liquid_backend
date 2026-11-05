@@ -2,7 +2,7 @@ from datetime import date
 from typing import Final
 
 from app.common.constants import DATE_WARNING_DAYS
-from app.common.enums import StatusEnum, ComponentType
+from app.common.enums import StatusEnum, DATE_BASED_COMPONENT_TYPES
 from app.common.utils.interval_utils import get_last_per_type
 from app.services.dto import VehicleDTO
 
@@ -79,7 +79,7 @@ class StatusCalculator:
 
         has_warning = False
         for replacement in last_by_type.values():
-            if replacement.component_type == ComponentType.TIRE_CHANGE:
+            if replacement.component_type in DATE_BASED_COMPONENT_TYPES:
                 date_result = StatusCalculator.calculate_date_status(replacement.next_change_date)
                 status = date_result['status']
             else:
