@@ -1,7 +1,7 @@
 from datetime import date
 from sqlalchemy.orm import Session
 from app.api.replacement.schema import ReplacementCreateRequest
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES, DATE_ONLY_COMPONENT_TYPES
 from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
@@ -15,7 +15,8 @@ _MSG_DATE_LESS_THAN_PREVIOUS = 'Дата ({date}) не может быть ра�
 _MSG_KM_GREATER_THAN_NEXT = 'Пробег ({km}) не может быть больше следующей замены ({next_km})'
 _MSG_DATE_GREATER_THAN_NEXT = 'Дата ({date}) не может быть позже следующей замены ({next_date})'
 _MSG_DUPLICATE_REPLACEMENT = 'Замена с текущим пробегом уже существует'
-_MSG_INSURANCE_DATE_REQUIRED = 'Для страховки необходимо указать дату окончания'
+_MSG_INSURANCE_DATE_REQUIRED = 'Необходимо указать дату окончания'
+_MSG_DATE_END_BEFORE_START = 'Дата окончания не может быть раньше даты начала'
 
 
 class ReplacementService:
@@ -39,10 +40,13 @@ class ReplacementService:
             raise ValueError(_MSG_VEHICLE_NOT_FOUND.format(vehicle_id=vehicle_id))
 
         is_date_based = request.component_type in DATE_BASED_COMPONENT_TYPES
-        is_insurance = request.component_type == ComponentType.INSURANCE
+        is_date_only = request.component_type in DATE_ONLY_COMPONENT_TYPES
 
-        if is_insurance and request.next_change_date is None:
-            raise ValueError(_MSG_INSURANCE_DATE_REQUIRED)
+        if is_date_only:
+            if request.next_change_date is None:
+                raise ValueError(_MSG_INSURANCE_DATE_REQUIRED)
+            if request.next_change_date < request.replacement_date:
+                raise ValueError(_MSG_DATE_END_BEFORE_START)
 
         if not is_date_based:
             self._validate_common(
@@ -62,7 +66,7 @@ class ReplacementService:
                 request.km_at_replacement,
             )
 
-        km_at_replacement = 0 if is_insurance else request.km_at_replacement
+        km_at_replacement = 0 if is_date_only else request.km_at_replacement
         self._update_vehicle_km_if_needed(
             vehicle_dto,
             km_at_replacement,
@@ -87,7 +91,7 @@ class ReplacementService:
             component_type=request.component_type,
             component_name=request.component_name,
             component_price=request.component_price,
-            work_price=None if is_insurance else request.work_price,
+            work_price=None if is_date_only else request.work_price,
             replacement_date=request.replacement_date,
             km_at_replacement=km_at_replacement,
             interval_km=interval_km,
@@ -181,19 +185,28 @@ class ReplacementService:
             return None
 
         is_date_based = replacement.component_type in DATE_BASED_COMPONENT_TYPES
-        is_insurance = replacement.component_type == ComponentType.INSURANCE
+        is_date_only = replacement.component_type in DATE_ONLY_COMPONENT_TYPES
 
-        if is_insurance:
+        if is_date_only:
             kwargs.pop('km_at_replacement', None)
             kwargs.pop('work_price', None)
 
         new_km = kwargs.get('km_at_replacement')
         new_date = kwargs.get('replacement_date')
+        reset_date_notify = False
+
+        if is_date_only:
+            end_date = kwargs.get('next_change_date', replacement.next_change_date)
+            start_date = new_date if new_date is not None else replacement.replacement_date
+            if end_date is not None and end_date < start_date:
+                raise ValueError(_MSG_DATE_END_BEFORE_START)
 
         if is_date_based and 'next_change_date' in kwargs:
             if kwargs['next_change_date'] != replacement.next_change_date:
-                kwargs['date_warning_notified'] = False
-                kwargs['date_overdue_notified'] = False
+                reset_date_notify = True
+
+        if is_date_only and new_date is not None and new_date != replacement.replacement_date:
+            reset_date_notify = True
 
         vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
 
@@ -228,8 +241,7 @@ class ReplacementService:
                 )
                 if new_next_date != replacement.next_change_date:
                     kwargs['next_change_date'] = new_next_date
-                    kwargs['date_warning_notified'] = False
-                    kwargs['date_overdue_notified'] = False
+                    reset_date_notify = True
 
         for key, value in kwargs.items():
             if value is not None and hasattr(replacement, key):
@@ -240,6 +252,12 @@ class ReplacementService:
             self.vehicle_repository.save(vehicle_dto)
 
         updated = self.repository.save(replacement)
+        if reset_date_notify:
+            self.repository.update_date_notify_tracking(
+                replacement_id,
+                date_warning_notified=False,
+                date_overdue_notified=False,
+            )
         return updated
 
     def delete(self, replacement_id: int) -> bool:

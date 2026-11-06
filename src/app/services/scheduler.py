@@ -4,9 +4,9 @@ from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from app.common.constants import DATE_WARNING_DAYS
+from app.common.constants import get_date_warning_days
 from app.common.component_config import COMPONENTS_CONFIG
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS, DATE_ONLY_COMPONENT_KEYS
 from app.common.utils.interval_utils import add_months
 from app.db.database import SessionLocal
 from app.repository.replacement_repository import ReplacementRepository
@@ -68,12 +68,13 @@ def _check_date_notifications() -> None:
                 today = date.today()
                 days_remaining = (next_change_date - today).days
                 component_name = last_repl["component_name"]
+                warning_days = get_date_warning_days(comp_key)
 
-                if days_remaining <= 0:
+                if days_remaining < 0:
                     if last_repl.get("date_overdue_notified"):
                         continue
                     is_overdue = True
-                elif days_remaining <= DATE_WARNING_DAYS:
+                elif days_remaining <= warning_days:
                     if last_repl.get("date_warning_notified"):
                         continue
                     is_overdue = False
@@ -100,6 +101,7 @@ def _check_date_notifications() -> None:
                         next_change_date=next_change_date.isoformat(),
                         days_remaining=days_remaining,
                         is_overdue=is_overdue,
+                        is_expiry=comp_key in DATE_ONLY_COMPONENT_KEYS,
                     )
                 except Exception:
                     logger.exception(

@@ -225,3 +225,29 @@ class TestGetVehicleStatus:
         result = StatusCalculator.get_vehicle_status(vehicle, [insurance])
 
         assert result == StatusEnum.WARNING.value
+
+
+def test_parking_monthly_status_uses_one_day_warning(vehicle: VehicleDTO) -> None:
+    parking = ReplacementDTO(
+        id=1,
+        vehicle_id=1,
+        component_type=ComponentType.PARKING_MONTHLY,
+        component_name='Машиноместо',
+        component_price=5000,
+        work_price=None,
+        replacement_date=date.today() - timedelta(days=27),
+        km_at_replacement=0,
+        interval_km=0,
+        next_change_date=date.today() + timedelta(days=3),
+    )
+
+    assert StatusCalculator.get_vehicle_status(vehicle, [parking]) == StatusEnum.GOOD.value
+
+    parking.next_change_date = date.today() + timedelta(days=1)
+    assert StatusCalculator.get_vehicle_status(vehicle, [parking]) == StatusEnum.WARNING.value
+
+    parking.next_change_date = date.today() + timedelta(days=0)
+    assert StatusCalculator.get_vehicle_status(vehicle, [parking]) == StatusEnum.WARNING.value
+
+    parking.next_change_date = date.today() - timedelta(days=1)
+    assert StatusCalculator.get_vehicle_status(vehicle, [parking]) == StatusEnum.OVERDUE.value

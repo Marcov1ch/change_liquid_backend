@@ -20,7 +20,7 @@ class ReplacementCreateRequest(ReplacementBase):
     )
     next_change_date: date | None = Field(
         None,
-        description='Дата следующей обязательной замены (для шин и страховки)',
+        description='Дата следующей замены или окончания срока (шины, страховка, парковка)',
         examples=['2026-11-01'],
     )
 
