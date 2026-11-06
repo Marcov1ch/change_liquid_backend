@@ -134,20 +134,28 @@ def send_date_notification_email(
     next_change_date: str,
     days_remaining: int,
     is_overdue: bool = False,
+    is_expiry: bool = False,
 ) -> None:
-    """Отправить email о date-based замене (шины)."""
+    """Отправить email о date-based замене (шины, страховка, аренда машиноместа)."""
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
     if is_overdue:
         emoji = "🔴"
-        status_text = "Просрочено! Требуется замена!"
+        status_text = "Срок действия истёк!" if is_expiry else "Просрочено! Требуется замена!"
     else:
         emoji = "🟡"
-        status_text = "Скоро требуется замена"
+        status_text = "Срок действия истекает" if is_expiry else "Скоро требуется замена"
 
     days_str = f"просрочено на {-days_remaining} дн." if is_overdue else f"осталось {days_remaining} дн."
 
-    subject = _header(f"Change Liquid — {component_name}: требуется замена")
+    if is_expiry:
+        subject_text = "срок истёк" if is_overdue else "срок истекает"
+        date_label = "Дата окончания"
+    else:
+        subject_text = "требуется замена"
+        date_label = "Дата следующей замены"
+
+    subject = _header(f"Change Liquid — {component_name}: {subject_text}")
 
     body = f"""
     <h2>{emoji} {status_text}</h2>
@@ -155,7 +163,7 @@ def send_date_notification_email(
     <p>По данным системы, на автомобиле
     <strong>{_html(brand)} {_html(model)}</strong> ({_html(plate_number)})<br>
     {_html(component_name)}: {days_str}</p>
-    <p><strong>Дата следующей замены:</strong> {next_change_date}</p>
+    <p><strong>{date_label}:</strong> {next_change_date}</p>
     <hr>
     <p style="font-size: 12px; color: #888;">
         Если вы не хотите получать уведомления,

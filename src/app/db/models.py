@@ -96,6 +96,7 @@ class VehicleDB(Base):  # type: ignore
 
     tire_notify_enabled = Column(Boolean, default=True)
     insurance_notify_enabled = Column(Boolean, default=True)
+    parking_monthly_notify_enabled = Column(Boolean, default=True)
 
     owner = relationship("UserDB", back_populates="vehicles")
     brand_ref = relationship("BrandDB", lazy="joined")

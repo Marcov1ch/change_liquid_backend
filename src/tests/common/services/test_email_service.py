@@ -64,3 +64,45 @@ def test_send_grouped_notification_email_escapes_user_data() -> None:
     assert '<script>' not in body
     assert '&lt;script&gt;' in body
     assert '\r' not in subject and '\n' not in subject
+
+
+def test_send_date_notification_email_uses_expiry_wording() -> None:
+    with patch('app.services.email_service._send_email') as mock_send:
+        send_date_notification_email(
+            to_email='user@example.com',
+            username='User',
+            brand='Toyota',
+            model='Camry',
+            plate_number='A123AA178',
+            component_name='Машиноместо № 12',
+            next_change_date='2026-11-01',
+            days_remaining=1,
+            is_overdue=False,
+            is_expiry=True,
+        )
+
+    subject, body = mock_send.call_args.args[1], mock_send.call_args.args[2]
+    assert 'истекает' in subject
+    assert 'Дата окончания' in body
+    assert 'следующей замены' not in body
+
+
+def test_send_date_notification_email_uses_expired_wording() -> None:
+    with patch('app.services.email_service._send_email') as mock_send:
+        send_date_notification_email(
+            to_email='user@example.com',
+            username='User',
+            brand='Toyota',
+            model='Camry',
+            plate_number='A123AA178',
+            component_name='Машиноместо № 12',
+            next_change_date='2026-11-01',
+            days_remaining=-1,
+            is_overdue=True,
+            is_expiry=True,
+        )
+
+    subject, body = mock_send.call_args.args[1], mock_send.call_args.args[2]
+    assert 'истёк' in subject
+    assert 'истёк' in body
+    assert 'просрочена' not in body

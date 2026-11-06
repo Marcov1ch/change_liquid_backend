@@ -1,5 +1,7 @@
 import pytest
 
+from datetime import date, timedelta
+
 from app.common.enums import StatusEnum
 from app.common.utils.calculator import StatusCalculator
 
@@ -34,3 +36,25 @@ def test_calculate_status(
     assert result["km_remaining"] == exp_remaining
     assert result["status"] == exp_status
     assert result["next_replacement_km"] == _expected_next(km_at, interval)
+
+
+@pytest.mark.parametrize(
+    ("days_remaining", "warning_days", "exp_status"),
+    [
+        pytest.param(3, 1, StatusEnum.GOOD.value, id="parking_good"),
+        pytest.param(1, 1, StatusEnum.WARNING.value, id="parking_warning"),
+        pytest.param(0, 1, StatusEnum.WARNING.value, id="parking_end_today"),
+        pytest.param(-1, 1, StatusEnum.OVERDUE.value, id="parking_overdue"),
+    ],
+)
+def test_calculate_date_status_uses_warning_days(
+    days_remaining: int,
+    warning_days: int,
+    exp_status: str,
+) -> None:
+    result = StatusCalculator.calculate_date_status(
+        date.today() + timedelta(days=days_remaining),
+        warning_days,
+    )
+    assert result["days_remaining"] == days_remaining
+    assert result["status"] == exp_status

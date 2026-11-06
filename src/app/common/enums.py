@@ -15,9 +15,12 @@ class ComponentType(Enum):
     FUEL_FILTER = "fuel_filter"
     TIRE_CHANGE = "tire_change"
     INSURANCE = "insurance"
+    PARKING_MONTHLY = "parking_monthly"
 
 
-DATE_BASED_COMPONENT_TYPES = frozenset({ComponentType.TIRE_CHANGE, ComponentType.INSURANCE})
+DATE_ONLY_COMPONENT_TYPES = frozenset({ComponentType.INSURANCE, ComponentType.PARKING_MONTHLY})
+DATE_ONLY_COMPONENT_KEYS = frozenset(component.value for component in DATE_ONLY_COMPONENT_TYPES)
+DATE_BASED_COMPONENT_TYPES = frozenset({ComponentType.TIRE_CHANGE}) | DATE_ONLY_COMPONENT_TYPES
 DATE_BASED_COMPONENT_KEYS = frozenset(component.value for component in DATE_BASED_COMPONENT_TYPES)
 
 

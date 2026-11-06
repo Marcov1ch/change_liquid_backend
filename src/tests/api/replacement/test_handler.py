@@ -115,3 +115,43 @@ def test_archival_insurance_keeps_stored_date() -> None:
     assert response.status == StatusEnum.REPLACED
     assert response.km_remaining is None
     assert response.km_traveled is None
+
+
+def test_latest_parking_monthly_uses_date_status_and_hides_mileage() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.PARKING_MONTHLY)
+    replacement.km_at_replacement = 0
+    replacement.interval_km = 0
+    replacement.work_price = None
+    replacement.next_change_date = date.today() + timedelta(days=3)
+
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=True)
+
+    assert response.status == StatusEnum.GOOD
+    assert response.days_remaining == 3
+    assert response.next_replacement_km is None
+    assert response.km_remaining is None
+    assert response.km_traveled is None
+
+    replacement.next_change_date = date.today() + timedelta(days=1)
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=True)
+    assert response.status == StatusEnum.WARNING
+
+    replacement.next_change_date = date.today() - timedelta(days=1)
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=True)
+    assert response.status == StatusEnum.OVERDUE
+
+
+def test_archival_parking_monthly_keeps_stored_date() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.PARKING_MONTHLY)
+    replacement.km_at_replacement = 0
+    replacement.interval_km = 0
+    replacement.next_change_date = date(2026, 11, 1)
+
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=False)
+
+    assert response.next_change_date == date(2026, 11, 1)
+    assert response.status == StatusEnum.REPLACED
+    assert response.km_remaining is None
+    assert response.km_traveled is None
