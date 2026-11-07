@@ -4,8 +4,8 @@ from datetime import date
 from typing import Any
 
 from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES
-from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
-from app.services.dto import VehicleDTO
+from app.common.utils.interval_utils import ComponentIntervalUtils, add_months, get_last_per_type
+from app.services.dto import ReplacementDTO, VehicleDTO
 
 
 def _vehicle(intervals: dict | None = None, **kwargs: Any) -> VehicleDTO:
@@ -126,3 +126,40 @@ def test_get_next_change_date_none() -> None:
     assert ComponentIntervalUtils.get_next_change_date(
         vehicle, ComponentType.ENGINE_OIL, date(2026, 1, 15),
     ) is None
+
+
+def _replacement(
+    component_type: ComponentType,
+    replacement_id: int,
+    replacement_date: date,
+    km: int = 0,
+) -> ReplacementDTO:
+    return ReplacementDTO(
+        id=replacement_id,
+        vehicle_id=1,
+        component_type=component_type,
+        component_name='',
+        component_price=None,
+        work_price=None,
+        replacement_date=replacement_date,
+        km_at_replacement=km,
+        interval_km=0,
+    )
+
+
+def test_get_last_per_type_date_only_uses_replacement_date() -> None:
+    older = _replacement(ComponentType.PARKING_MONTHLY, 2, date(2026, 1, 1))
+    newer = _replacement(ComponentType.PARKING_MONTHLY, 1, date(2026, 2, 1))
+
+    result = get_last_per_type([older, newer])
+
+    assert result[ComponentType.PARKING_MONTHLY] is newer
+
+
+def test_get_last_per_type_regular_component_uses_km() -> None:
+    low_km = _replacement(ComponentType.ENGINE_OIL, 2, date(2026, 2, 1), km=1000)
+    high_km = _replacement(ComponentType.ENGINE_OIL, 1, date(2026, 1, 1), km=2000)
+
+    result = get_last_per_type([low_km, high_km])
+
+    assert result[ComponentType.ENGINE_OIL] is high_km

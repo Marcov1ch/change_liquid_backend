@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.db.models import ReplacementDB
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS
+from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS, DATE_ONLY_COMPONENT_KEYS
 from app.services.dto import ReplacementDTO
 
 
@@ -13,6 +13,17 @@ class ReplacementRepository:
 
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def _is_newer_row(candidate: ReplacementDB, current: ReplacementDB) -> bool:
+        """Сравнить замены: для date-only — по дате начала, иначе — по пробегу."""
+        if candidate.component_type in DATE_ONLY_COMPONENT_KEYS:
+            if candidate.replacement_date != current.replacement_date:
+                return bool(candidate.replacement_date > current.replacement_date)
+            return bool((candidate.id or 0) > (current.id or 0))
+        if candidate.km_at_replacement != current.km_at_replacement:
+            return bool(candidate.km_at_replacement > current.km_at_replacement)
+        return bool((candidate.id or 0) > (current.id or 0))
 
     @staticmethod
     def _to_dto(db_row: ReplacementDB) -> ReplacementDTO:
@@ -101,39 +112,19 @@ class ReplacementRepository:
         return [self._to_dto(replacement) for replacement in db_replacements]
 
     def get_latest_replacement_ids(self, vehicle_id: int) -> set[int]:
-        """Вернуть id последней замены по каждому типу компонента (max км, при равных — max id)."""
-        from sqlalchemy import func, and_
-
-        subq = (
-            self.db.query(
-                ReplacementDB.component_type,
-                func.max(ReplacementDB.km_at_replacement).label('max_km'),
-            )
-            .filter(ReplacementDB.vehicle_id == vehicle_id)
-            .group_by(ReplacementDB.component_type)
-            .subquery()
-        )
-
-        rows = (
-            self.db.query(ReplacementDB)
-            .join(
-                subq,
-                and_(
-                    ReplacementDB.component_type == subq.c.component_type,
-                    ReplacementDB.km_at_replacement == subq.c.max_km,
-                ),
-            )
-            .filter(ReplacementDB.vehicle_id == vehicle_id)
-            .all()
-        )
+        """Вернуть id последней замены по каждому типу компонента."""
+        rows = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+        ).all()
 
         best_by_type: dict[str, ReplacementDB] = {}
         for replacement in rows:
             key = replacement.component_type
-            if key not in best_by_type or replacement.id > best_by_type[key].id:
+            current = best_by_type.get(key)
+            if current is None or self._is_newer_row(replacement, current):
                 best_by_type[key] = replacement
 
-        return {r.id for r in best_by_type.values()}
+        return {r.id for r in best_by_type.values() if r.id is not None}
 
     def find_by_vehicle_and_component(
             self,
@@ -172,18 +163,20 @@ class ReplacementRepository:
             component_type: ComponentType
     ) -> Optional[ReplacementDTO]:
         """Получить последнюю замену для компонента автомобиля."""
-        db_replacement = self.db.query(ReplacementDB).filter(
+        rows = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
             ReplacementDB.component_type == component_type.value
-        ).order_by(
-            ReplacementDB.km_at_replacement.desc(),
-            ReplacementDB.id.desc(),
-        ).first()
+        ).all()
 
-        if not db_replacement:
+        if not rows:
             return None
 
-        return self._to_dto(db_replacement)
+        best = rows[0]
+        for row in rows[1:]:
+            if self._is_newer_row(row, best):
+                best = row
+
+        return self._to_dto(best)
 
     def find_previous_replacement(
         self,
@@ -241,16 +234,18 @@ class ReplacementRepository:
         component_type: ComponentType,
     ) -> Optional[dict]:
         """Получить последнюю замену с флагами уведомлений для проверки."""
-        db_replacement = self.db.query(ReplacementDB).filter(
+        rows = self.db.query(ReplacementDB).filter(
             ReplacementDB.vehicle_id == vehicle_id,
             ReplacementDB.component_type == component_type.value
-        ).order_by(
-            ReplacementDB.km_at_replacement.desc(),
-            ReplacementDB.id.desc(),
-        ).first()
+        ).all()
 
-        if not db_replacement:
+        if not rows:
             return None
+
+        db_replacement = rows[0]
+        for row in rows[1:]:
+            if self._is_newer_row(row, db_replacement):
+                db_replacement = row
 
         return {
             "id": db_replacement.id,
@@ -272,35 +267,15 @@ class ReplacementRepository:
         vehicle_id: int,
     ) -> list[dict]:
         """Получить последние замены для всех типов компонентов за один запрос."""
-        from sqlalchemy import func, and_
-
-        subq = (
-            self.db.query(
-                ReplacementDB.component_type,
-                func.max(ReplacementDB.km_at_replacement).label('max_km'),
-            )
-            .filter(ReplacementDB.vehicle_id == vehicle_id)
-            .group_by(ReplacementDB.component_type)
-            .subquery()
-        )
-
-        rows = (
-            self.db.query(ReplacementDB)
-            .join(
-                subq,
-                and_(
-                    ReplacementDB.component_type == subq.c.component_type,
-                    ReplacementDB.km_at_replacement == subq.c.max_km,
-                ),
-            )
-            .filter(ReplacementDB.vehicle_id == vehicle_id)
-            .all()
-        )
+        rows = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+        ).all()
 
         best_by_type: dict[str, ReplacementDB] = {}
         for replacement in rows:
             key = replacement.component_type
-            if key not in best_by_type or replacement.id > best_by_type[key].id:
+            current = best_by_type.get(key)
+            if current is None or self._is_newer_row(replacement, current):
                 best_by_type[key] = replacement
 
         return [

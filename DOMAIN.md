@@ -78,11 +78,11 @@ km_remaining        = next_replacement_km - current_km
 
 - У **всех** компонентов, кроме date-based (`tire_change`, `insurance`, `parking_monthly`), есть **оба** интервала: по пробегу и по месяцам.
 - `tire_change` — особый тип: его нет в `COMPONENTS_CONFIG`, у него нет интервалов по км/мес. Дата следующей замены (`next_change_date`) задаётся вручную при создании записи, статус считается только по дате. Пробег установки сохраняется в `km_at_replacement`; в ответе отдаётся `km_traveled` — сколько км проехали шины (до следующей записи шин или до текущего пробега авто для последней записи). Уведомлений по пробегу для шин нет.
- - `insurance` — особый тип, также вне `COMPONENTS_CONFIG`, только по дате. При создании `next_change_date` обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость страховки — в `component_price`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомления по пробегу для страховки нет.
- - `parking_monthly` — аренда машиноместа, вне `COMPONENTS_CONFIG`, только по дате. `replacement_date` — начало аренды, `next_change_date` — окончание и обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость — в `component_price`, место/номер договора — в `component_name`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомление приходит за 1 день до окончания; в день окончания статус `warning`, `overdue` — со следующего дня.
- - Интервал по пробегу влияет на статус (`good/warning/...`), интервал по месяцам — на `next_change_date` / `days_remaining`.
- - Интервалы хранятся у автомобиля (колонки `*_interval_km` / `*_interval_months`). Если значение не задано — подставляется дефолт из `COMPONENTS_CONFIG` (см. `VehicleRepository._intervals_and_flags`).
- - Флаги уведомлений также хранятся у автомобиля (`*_notify_enabled`, плюс `tire_notify_enabled`, `insurance_notify_enabled` и `parking_monthly_notify_enabled`) и переключаются через `PATCH /api/v1/vehicles/{id}/notify`.
+- `insurance` — особый тип, также вне `COMPONENTS_CONFIG`, только по дате. При создании `next_change_date` обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость страховки — в `component_price`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомления по пробегу для страховки нет.
+- `parking_monthly` — аренда машиноместа, вне `COMPONENTS_CONFIG`, только по дате. `replacement_date` — начало аренды, `next_change_date` — окончание и обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость — в `component_price`, место/номер договора — в `component_name`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомление приходит за 1 день до окончания; в день окончания статус `warning`, `overdue` — со следующего дня.
+- Интервал по пробегу влияет на статус (`good/warning/...`), интервал по месяцам — на `next_change_date` / `days_remaining`.
+- Интервалы хранятся у автомобиля (колонки `*_interval_km` / `*_interval_months`). Если значение не задано — подставляется дефолт из `COMPONENTS_CONFIG` (см. `VehicleRepository._intervals_and_flags`).
+- Флаги уведомлений также хранятся у автомобиля (`*_notify_enabled`, плюс `tire_notify_enabled`, `insurance_notify_enabled` и `parking_monthly_notify_enabled`) и переключаются через `PATCH /api/v1/vehicles/{id}/notify`.
 
 ## Уведомления
 
@@ -138,7 +138,7 @@ km_remaining        = next_replacement_km - current_km
 
 Для date-based (`tire_change`, `insurance`, `parking_monthly`) проверки хронологии и дубликата пропускаются (можно задавать `next_change_date` вручную). Для шин введённый пробег установки сохраняется, и `current_km` авто обновляется, если он больше текущего. Для страховки и аренды машиноместа `next_change_date` обязательна, пробег и работы не сохраняются (`0`/`None`); для парковки также проверяется, что дата окончания не раньше даты начала аренды.
 
-При **обновлении** (`update`) те же проверки выполняются с `exclude_id` и поиском соседей (`find_neighbors`): значение не должно быть меньше предыдущей и больше следующей замены. При изменении даты не-date-based замены пересчитывается `next_change_date` и сбрасываются date-флаги; для date-only при смене даты начала или `next_change_date` сбрасываются date-флаги.
+При **обновлении** (`update`) те же проверки выполняются с `exclude_id` и поиском соседей (`find_neighbors`): значение не должно быть меньше предыдущей и больше следующей замены. При изменении даты не-date-based замены пересчитывается `next_change_date` и сбрасываются date-флаги; для date-based при смене `next_change_date`, а для date-only также при смене даты начала сбрасываются date-флаги.
 
 ### Массовое создание (ТО)
 
