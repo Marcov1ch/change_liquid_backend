@@ -1,8 +1,15 @@
 from datetime import date
 
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, DATE_ONLY_COMPONENT_TYPES
 from app.common.component_config import COMPONENTS_CONFIG
 from app.services.dto import ReplacementDTO, VehicleDTO
+
+
+def _is_newer_date_only(candidate: ReplacementDTO, current: ReplacementDTO) -> bool:
+    """Сравнить date-only замены: свежее та, у которой позже дата начала."""
+    if candidate.replacement_date != current.replacement_date:
+        return bool(candidate.replacement_date > current.replacement_date)
+    return bool((candidate.id or 0) > (current.id or 0))
 
 
 def add_months(source: date, months: int) -> date:
@@ -33,16 +40,27 @@ def get_last_per_type(
 ) -> dict[ComponentType, ReplacementDTO]:
     """Вернуть последнюю замену по каждому типу.
 
-    Последняя = max(km_at_replacement), при равных — max(id).
+    Для date-only (страховка, аренда машиноместа) последняя = max(replacement_date),
+    при равных — max(id). Для остальных — max(km_at_replacement), при равных — max(id).
     """
     last_by_type: dict[ComponentType, ReplacementDTO] = {}
     for replacement in replacements:
         prev = last_by_type.get(replacement.component_type)
         if prev is None:
             last_by_type[replacement.component_type] = replacement
-        elif replacement.km_at_replacement > prev.km_at_replacement:
+            continue
+
+        if replacement.component_type in DATE_ONLY_COMPONENT_TYPES:
+            if _is_newer_date_only(replacement, prev):
+                last_by_type[replacement.component_type] = replacement
+            continue
+
+        if replacement.km_at_replacement > prev.km_at_replacement:
             last_by_type[replacement.component_type] = replacement
-        elif replacement.km_at_replacement == prev.km_at_replacement and (replacement.id or 0) > (prev.id or 0):  # noqa: E501
+        elif (
+            replacement.km_at_replacement == prev.km_at_replacement
+            and (replacement.id or 0) > (prev.id or 0)
+        ):
             last_by_type[replacement.component_type] = replacement
     return last_by_type
 
