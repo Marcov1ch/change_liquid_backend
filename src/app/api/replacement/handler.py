@@ -173,8 +173,7 @@ class ReplacementHandler:
         try:
             vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
 
-            update_data = request.model_dump(exclude_none=True)
-            replacement_dto = replacement_service.update(replacement.id, **update_data)
+            replacement_dto = replacement_service.update(replacement.id, request)
             vehicle = vehicle_service.get_by_id(replacement_dto.vehicle_id)
             km_traveled = replacement_service.get_tire_km_traveled(vehicle.id, vehicle.current_km)
 

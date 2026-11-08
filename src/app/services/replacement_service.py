@@ -1,6 +1,12 @@
+from dataclasses import dataclass
 from datetime import date
+
 from sqlalchemy.orm import Session
-from app.api.replacement.schema import ReplacementCreateRequest
+
+from app.api.replacement.schema import (
+    ReplacementCreateRequest,
+    UpdateReplacementRequest,
+)
 from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES, DATE_ONLY_COMPONENT_TYPES
 from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
 from app.repository.repair_repository import RepairRepository
@@ -23,6 +29,18 @@ _MSG_REPAIR_COST_CONFLICT = 'Нельзя указать стоимость: к�
 REPAIR_PLACEHOLDER_NAME = 'ВНЕСИТЕ ИЗМЕНЕНИЕ'
 
 
+@dataclass
+class _ReplacementUpdate:
+    """Итоговые значения замены после частичного обновления."""
+    component_name: str | None
+    component_price: int | None
+    work_price: int | None
+    replacement_date: date
+    km_at_replacement: int
+    next_change_date: date | None
+    reset_date_notify: bool
+
+
 class ReplacementService:
     """Класс для работы с заменами."""
 
@@ -30,6 +48,31 @@ class ReplacementService:
         self.repository = ReplacementRepository(db)
         self.vehicle_repository = VehicleRepository(db)
         self.repair_repository = RepairRepository(db)
+
+    def _resolve_intervals(
+        self,
+        vehicle_dto: VehicleDTO,
+        component_type: ComponentType,
+        replacement_date: date,
+        is_date_based: bool,
+        next_change_date: date | None = None,
+    ) -> tuple[int, int | None, date | None]:
+        """Рассчитать интервалы и дату следующей замены для компонента."""
+        if is_date_based:
+            return 0, None, next_change_date
+
+        interval_km = ComponentIntervalUtils.get_interval_for_component(
+            vehicle_dto,
+            component_type,
+        )
+        interval_months = ComponentIntervalUtils.get_interval_months_for_component(
+            vehicle_dto,
+            component_type,
+        )
+        if interval_months is not None:
+            next_change_date = add_months(replacement_date, interval_months)
+
+        return interval_km, interval_months, next_change_date
 
     def create(
         self,
@@ -86,17 +129,13 @@ class ReplacementService:
             commit,
         )
 
-        interval_km = (0 if is_date_based
-                       else ComponentIntervalUtils.get_interval_for_component(vehicle_dto, request.component_type))
-
-        next_change_date = request.next_change_date
-        interval_months = None
-        if not is_date_based:
-            interval_months = ComponentIntervalUtils.get_interval_months_for_component(
-                vehicle_dto, request.component_type,
-            )
-            if interval_months is not None:
-                next_change_date = add_months(request.replacement_date, interval_months)
+        interval_km, interval_months, next_change_date = self._resolve_intervals(
+            vehicle_dto,
+            request.component_type,
+            request.replacement_date,
+            is_date_based,
+            request.next_change_date,
+        )
 
         replacement = ReplacementDTO(
             id=None,
@@ -187,105 +226,187 @@ class ReplacementService:
         """Получить последнюю замену для компонента автомобиля."""
         return self.repository.get_last_replacement(vehicle_id, component_type)
 
-    def update(  # type: ignore[no-untyped-def]
+    def update(
         self,
         replacement_id: int,
-        **kwargs,
+        request: UpdateReplacementRequest,
+        commit: bool = True,
     ) -> ReplacementDTO | None:
         """Обновить запись о замене."""
         replacement = self.repository.find_by_id(replacement_id)
         if not replacement:
             return None
 
+        vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
+        update = self._resolve_update(replacement, request, vehicle_dto)
+        self._validate_update(replacement, update)
+        return self._apply_update(replacement, update, vehicle_dto, commit)
+
+    def _resolve_update(
+        self,
+        replacement: ReplacementDTO,
+        request: UpdateReplacementRequest,
+        vehicle_dto: VehicleDTO | None,
+    ) -> _ReplacementUpdate:
+        """Собрать итоговые значения замены из запроса и текущей записи."""
         is_date_based = replacement.component_type in DATE_BASED_COMPONENT_TYPES
         is_date_only = replacement.component_type in DATE_ONLY_COMPONENT_TYPES
 
-        if is_date_only:
-            kwargs.pop('km_at_replacement', None)
-            kwargs.pop('work_price', None)
-
-        new_km = kwargs.get('km_at_replacement')
-        new_date: date = kwargs.get('replacement_date') or replacement.replacement_date
-        new_component_price = (
-            kwargs.get('component_price')
-            if kwargs.get('component_price') is not None
+        replacement_date = (
+            request.replacement_date
+            if request.replacement_date is not None
+            else replacement.replacement_date
+        )
+        component_price = (
+            request.component_price
+            if request.component_price is not None
             else replacement.component_price
         )
-        new_work_price = (
-            kwargs.get('work_price')
-            if kwargs.get('work_price') is not None
-            else replacement.work_price
+
+        if is_date_only:
+            work_price = replacement.work_price
+            km_at_replacement = replacement.km_at_replacement
+        else:
+            work_price = (
+                request.work_price
+                if request.work_price is not None
+                else replacement.work_price
+            )
+            km_at_replacement = (
+                request.km_at_replacement
+                if request.km_at_replacement is not None
+                else replacement.km_at_replacement
+            )
+
+        next_change_date, reset_date_notify = self._resolve_next_change_date(
+            replacement,
+            request,
+            vehicle_dto,
+            replacement_date,
+            is_date_based,
+            is_date_only,
         )
+
+        return _ReplacementUpdate(
+            component_name=request.component_name,
+            component_price=component_price,
+            work_price=work_price,
+            replacement_date=replacement_date,
+            km_at_replacement=km_at_replacement,
+            next_change_date=next_change_date,
+            reset_date_notify=reset_date_notify,
+        )
+
+    def _resolve_next_change_date(
+        self,
+        replacement: ReplacementDTO,
+        request: UpdateReplacementRequest,
+        vehicle_dto: VehicleDTO | None,
+        replacement_date: date,
+        is_date_based: bool,
+        is_date_only: bool,
+    ) -> tuple[date | None, bool]:
+        """Определить дату следующей замены и необходимость сброса date-флагов."""
+        next_change_date = (
+            request.next_change_date
+            if request.next_change_date is not None
+            else replacement.next_change_date
+        )
+
+        if is_date_only:
+            reset = (
+                request.replacement_date is not None
+                and request.replacement_date != replacement.replacement_date
+            ) or (
+                request.next_change_date is not None
+                and request.next_change_date != replacement.next_change_date
+            )
+            return next_change_date, reset
+
+        if is_date_based:
+            reset = (
+                request.next_change_date is not None
+                and request.next_change_date != replacement.next_change_date
+            )
+            return next_change_date, reset
+
+        if vehicle_dto is not None:
+            next_change_date = ComponentIntervalUtils.get_next_change_date(
+                vehicle_dto,
+                replacement.component_type,
+                replacement_date,
+            )
+            return next_change_date, next_change_date != replacement.next_change_date
+
+        return next_change_date, False
+
+    def _validate_update(
+        self,
+        replacement: ReplacementDTO,
+        update: _ReplacementUpdate,
+    ) -> None:
+        """Проверить итоговые значения обновлённой замены."""
+        is_date_based = replacement.component_type in DATE_BASED_COMPONENT_TYPES
+        is_date_only = replacement.component_type in DATE_ONLY_COMPONENT_TYPES
 
         self._validate_repair_cost_conflict(
             replacement.vehicle_id,
             replacement.component_type,
-            new_date,
-            new_component_price,
-            new_work_price,
+            update.replacement_date,
+            update.component_price,
+            update.work_price,
         )
-        reset_date_notify = False
 
         if is_date_only:
-            end_date = kwargs.get('next_change_date', replacement.next_change_date)
-            start_date = new_date if new_date is not None else replacement.replacement_date
-            if end_date is not None and end_date < start_date:
+            if (
+                update.next_change_date is not None
+                and update.next_change_date < update.replacement_date
+            ):
                 raise ValueError(_MSG_DATE_END_BEFORE_START)
 
-        if is_date_based and 'next_change_date' in kwargs:
-            if kwargs['next_change_date'] != replacement.next_change_date:
-                reset_date_notify = True
+        if update.km_at_replacement < 0:
+            raise ValueError(_MSG_NEGATIVE_KM)
+        if update.replacement_date > date.today():
+            raise ValueError(_MSG_FUTURE_DATE)
 
-        if is_date_only and new_date is not None and new_date != replacement.replacement_date:
-            reset_date_notify = True
+        if not is_date_based:
+            self._validate_sequence(
+                replacement.vehicle_id,
+                replacement.component_type,
+                update.km_at_replacement,
+                update.replacement_date,
+                exclude_id=replacement.id,
+            )
 
-        vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
+    def _apply_update(
+        self,
+        replacement: ReplacementDTO,
+        update: _ReplacementUpdate,
+        vehicle_dto: VehicleDTO | None,
+        commit: bool,
+    ) -> ReplacementDTO:
+        """Записать итоговые значения и сохранить замену."""
+        is_date_only = replacement.component_type in DATE_ONLY_COMPONENT_TYPES
 
-        if new_km is not None:
-            if new_km < 0:
-                raise ValueError('Пробег не может быть отрицательным')
+        if update.component_name is not None:
+            replacement.component_name = update.component_name
+        if update.component_price is not None:
+            replacement.component_price = update.component_price
+        if not is_date_only:
+            replacement.work_price = update.work_price
+            replacement.km_at_replacement = update.km_at_replacement
 
-            if not is_date_based:
-                self._validate_sequence(
-                    replacement.vehicle_id,
-                    replacement.component_type,
-                    new_km,
-                    replacement.replacement_date,
-                    exclude_id=replacement_id,
-                )
-
-        if new_date is not None:
-            if new_date > date.today():
-                raise ValueError('Дата не может быть в будущем')
-            if not is_date_based:
-                self._validate_sequence(
-                    replacement.vehicle_id,
-                    replacement.component_type,
-                    replacement.km_at_replacement,
-                    new_date,
-                    exclude_id=replacement_id,
-                )
-
-            if not is_date_based and vehicle_dto is not None:
-                new_next_date = ComponentIntervalUtils.get_next_change_date(
-                    vehicle_dto, replacement.component_type, new_date,
-                )
-                if new_next_date != replacement.next_change_date:
-                    kwargs['next_change_date'] = new_next_date
-                    reset_date_notify = True
-
-        for key, value in kwargs.items():
-            if value is not None and hasattr(replacement, key):
-                setattr(replacement, key, value)
+        replacement.replacement_date = update.replacement_date
+        replacement.next_change_date = update.next_change_date
 
         if vehicle_dto and replacement.km_at_replacement > vehicle_dto.current_km:
             vehicle_dto.current_km = replacement.km_at_replacement
-            self.vehicle_repository.save(vehicle_dto)
+            self.vehicle_repository.save(vehicle_dto, commit=commit)
 
-        updated = self.repository.save(replacement)
-        if reset_date_notify:
+        updated = self.repository.save(replacement, commit=commit)
+        if update.reset_date_notify and replacement.id is not None:
             self.repository.update_date_notify_tracking(
-                replacement_id,
+                replacement.id,
                 date_warning_notified=False,
                 date_overdue_notified=False,
             )
@@ -320,15 +441,12 @@ class ReplacementService:
 
         self._validate_common(km_at_replacement, replacement_date)
 
-        interval_km = ComponentIntervalUtils.get_interval_for_component(
-            vehicle_dto, component_type,
+        interval_km, interval_months, next_change_date = self._resolve_intervals(
+            vehicle_dto,
+            component_type,
+            replacement_date,
+            is_date_based=False,
         )
-        interval_months = ComponentIntervalUtils.get_interval_months_for_component(
-            vehicle_dto, component_type,
-        )
-        next_change_date = None
-        if interval_months is not None:
-            next_change_date = add_months(replacement_date, interval_months)
 
         replacement = ReplacementDTO(
             id=None,
@@ -355,19 +473,11 @@ class ReplacementService:
         work_price: int | None,
     ) -> None:
         """Запретить стоимость замены, если компонент входит в ремонт на эту дату."""
-        has_price = (
-            isinstance(component_price, int) and component_price > 0
-        ) or (
-            isinstance(work_price, int) and work_price > 0
-        )
+        has_price = (component_price or 0) > 0 or (work_price or 0) > 0
         if not has_price:
             return
 
-        repair_repository = getattr(self, 'repair_repository', None)
-        if repair_repository is None:
-            return
-
-        repair = repair_repository.find_repair_for_replacement(
+        repair = self.repair_repository.find_repair_for_replacement(
             vehicle_id,
             component_type,
             replacement_date,
