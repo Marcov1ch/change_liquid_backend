@@ -71,15 +71,18 @@ def test_hard_delete_removes_replacements_and_other_expenses() -> None:
         patch('app.api.vehicle.handler.VehicleService') as vehicle_service_cls,
         patch('app.api.vehicle.handler.ReplacementService') as replacement_service_cls,
         patch('app.api.vehicle.handler.OtherExpenseService') as other_expense_service_cls,
+        patch('app.api.vehicle.handler.RepairService') as repair_service_cls,
     ):
         replacement_service = replacement_service_cls.return_value
         other_expense_service = other_expense_service_cls.return_value
+        repair_service = repair_service_cls.return_value
 
         response = asyncio.run(
             VehicleHandler().hard_delete_vehicle(db=db, vehicle=_vehicle())
         )
 
     replacement_service.delete_by_vehicle.assert_called_once_with(1, commit=False)
+    repair_service.delete_by_vehicle.assert_called_once_with(1, commit=False)
     other_expense_service.delete_by_vehicle.assert_called_once_with(1, commit=False)
     vehicle_service_cls.return_value.hard_delete.assert_called_once_with(1, commit=False)
     db.commit.assert_called_once()

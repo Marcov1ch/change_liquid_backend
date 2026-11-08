@@ -3,6 +3,7 @@ from fastapi import FastAPI, APIRouter
 from app.api.vehicle.handler import vehicle_handler
 from app.api.replacement.handler import replacement_handler
 from app.api.other_expense.handler import other_expense_handler
+from app.api.repair.handler import repair_handler
 from app.api.enums.handler import enums_handler
 from app.api.share.handler import share_handler
 
@@ -141,6 +142,38 @@ def setup_routes(app: FastAPI) -> None:
         other_expense_handler.delete_other_expense,
         methods=["DELETE"],
         tags=["other-expenses"]
+    )
+
+    # Маршруты для ремонтов
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/repairs",
+        repair_handler.get_vehicle_repairs,
+        methods=["GET"],
+        tags=["repairs"]
+    )
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/repairs",
+        repair_handler.create_repair,
+        methods=["POST"],
+        tags=["repairs"]
+    )
+    router.add_api_route(
+        "/repairs/{repair_id}",
+        repair_handler.get_repair,
+        methods=["GET"],
+        tags=["repairs"]
+    )
+    router.add_api_route(
+        "/repairs/{repair_id}",
+        repair_handler.update_repair,
+        methods=["PUT"],
+        tags=["repairs"]
+    )
+    router.add_api_route(
+        "/repairs/{repair_id}",
+        repair_handler.delete_repair,
+        methods=["DELETE"],
+        tags=["repairs"]
     )
 
     # Маршруты для публичного шаринга

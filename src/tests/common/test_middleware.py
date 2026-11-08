@@ -16,8 +16,10 @@ from app.common.middleware import (
     verify_replacement_view_access,
     verify_other_expense_access,
     verify_other_expense_view_access,
+    verify_repair_access,
+    verify_repair_view_access,
 )
-from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO
+from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO, RepairDTO
 
 
 @pytest.fixture
@@ -392,6 +394,121 @@ class TestVerifyOtherExpenseAccess:
             )
 
         assert result is expense
+
+
+class TestVerifyRepairAccess:
+
+    def _repair(self) -> RepairDTO:
+        return RepairDTO(
+            id=1, vehicle_id=1, repair_date=date(2026, 1, 15),
+            km_at_repair=15000, description='ТО', work_cost=2000, parts_cost=3000,
+            component_types=[ComponentType.ENGINE_OIL],
+        )
+
+    def test_returns_repair_when_owner_matches(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        repair = self._repair()
+
+        with (
+            patch('app.common.middleware.RepairService') as repair_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            repair_service.return_value.get_by_id.return_value = repair
+            vehicle_service.return_value.get_by_id.return_value = vehicle_dto
+
+            result = verify_repair_access(
+                repair_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is repair
+        repair_service.return_value.get_by_id.assert_called_once_with(1)
+
+    def test_raises_404_when_repair_not_found(self) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with patch('app.common.middleware.RepairService') as repair_service:
+            repair_service.return_value.get_by_id.return_value = None
+
+            with pytest.raises(HTTPException) as exc:
+                verify_repair_access(
+                    repair_id=999, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 404
+        assert exc.value.detail == 'Ремонт не найден'
+
+    def test_raises_403_when_owner_does_not_match(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 99
+
+        with (
+            patch('app.common.middleware.RepairService') as repair_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            repair_service.return_value.get_by_id.return_value = self._repair()
+            vehicle_service.return_value.get_by_id.return_value = vehicle_dto
+
+            with pytest.raises(HTTPException) as exc:
+                verify_repair_access(
+                    repair_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 403
+
+    def test_raises_409_when_vehicle_archived(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with (
+            patch('app.common.middleware.RepairService') as repair_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            repair_service.return_value.get_by_id.return_value = self._repair()
+            vehicle_service.return_value.get_by_id.return_value = dataclasses.replace(
+                vehicle_dto, is_active=False,
+            )
+
+            with pytest.raises(HTTPException) as exc:
+                verify_repair_access(
+                    repair_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 409
+
+    def test_view_allows_archived_vehicle(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        repair = self._repair()
+
+        with (
+            patch('app.common.middleware.RepairService') as repair_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            repair_service.return_value.get_by_id.return_value = repair
+            vehicle_service.return_value.get_by_id.return_value = dataclasses.replace(
+                vehicle_dto, is_active=False,
+            )
+
+            result = verify_repair_view_access(
+                repair_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is repair
 
 
 class TestLoggingMiddleware:

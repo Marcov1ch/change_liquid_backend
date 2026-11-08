@@ -71,6 +71,10 @@ class ReplacementResponse(ReplacementBase):
         ...,
         description='Статус замены',
     )
+    source_repair_id: int | None = Field(
+        None,
+        description='ID ремонта, из которого создана служебная замена',
+    )
 
 
 class UpdateReplacementRequest(BaseModel):

@@ -39,6 +39,7 @@ def build_replacement_response(
             next_change_date=next_change_date,
             days_remaining=None,
             status=StatusEnum.REPLACED.value,
+            source_repair_id=replacement_dto.source_repair_id,
         )
 
     if is_date_based:
@@ -62,6 +63,7 @@ def build_replacement_response(
             next_change_date=status_data["next_change_date"],
             days_remaining=status_data["days_remaining"],
             status=status_data["status"],
+            source_repair_id=replacement_dto.source_repair_id,
         )
 
     interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
@@ -96,4 +98,5 @@ def build_replacement_response(
         next_change_date=next_change_date,
         days_remaining=days_remaining,
         status=status_data["status"],
+        source_repair_id=replacement_dto.source_repair_id,
     )

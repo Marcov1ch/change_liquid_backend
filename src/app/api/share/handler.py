@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.replacement.mapper import build_replacement_response
 from app.api.share.schema import (
     PublicOtherExpenseResponse,
+    PublicRepairResponse,
     PublicReplacementResponse,
     PublicVehicleResponse,
     ShareLinkResponse,
@@ -16,6 +17,7 @@ from app.common.utils.calculator import StatusCalculator
 from app.db.database import get_db
 from app.services.dto import VehicleDTO
 from app.services.other_expense_service import OtherExpenseService
+from app.services.repair_service import RepairService
 from app.services.replacement_service import ReplacementService
 from app.services.share_service import VehicleShareService
 
@@ -143,6 +145,20 @@ class ShareHandler:
                 for expense in other_expense_service.get_by_vehicle(vehicle.id)
             ]
 
+            repair_service = RepairService(db)
+            public_repairs = [
+                PublicRepairResponse(
+                    id=repair.id,
+                    repair_date=repair.repair_date,
+                    km_at_repair=repair.km_at_repair,
+                    description=repair.description,
+                    work_cost=repair.work_cost,
+                    parts_cost=repair.parts_cost,
+                    component_types=repair.component_types,
+                )
+                for repair in repair_service.get_by_vehicle(vehicle.id)
+            ]
+
             return PublicVehicleResponse(
                 brand=vehicle.brand,
                 model=vehicle.model,
@@ -152,6 +168,7 @@ class ShareHandler:
                 vehicle_status=StatusCalculator.get_vehicle_status(vehicle, replacements),
                 replacements=public_replacements,
                 other_expenses=public_other_expenses,
+                repairs=public_repairs,
                 register_url=build_register_url(),
             )
         except HTTPException:

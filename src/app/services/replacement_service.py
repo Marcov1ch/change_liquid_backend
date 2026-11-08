@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.api.replacement.schema import ReplacementCreateRequest
 from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES, DATE_ONLY_COMPONENT_TYPES
 from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
+from app.repository.repair_repository import RepairRepository
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
 from app.services.dto import ReplacementDTO, VehicleDTO
@@ -17,6 +18,9 @@ _MSG_DATE_GREATER_THAN_NEXT = 'Дата ({date}) не может быть поз
 _MSG_DUPLICATE_REPLACEMENT = 'Замена с текущим пробегом уже существует'
 _MSG_INSURANCE_DATE_REQUIRED = 'Необходимо указать дату окончания'
 _MSG_DATE_END_BEFORE_START = 'Дата окончания не может быть раньше даты начала'
+_MSG_REPAIR_COST_CONFLICT = 'Нельзя указать стоимость: компонент входит в ремонт от {date}'
+
+REPAIR_PLACEHOLDER_NAME = 'ВНЕСИТЕ ИЗМЕНЕНИЕ'
 
 
 class ReplacementService:
@@ -25,6 +29,7 @@ class ReplacementService:
     def __init__(self, db: Session):
         self.repository = ReplacementRepository(db)
         self.vehicle_repository = VehicleRepository(db)
+        self.repair_repository = RepairRepository(db)
 
     def create(
         self,
@@ -38,6 +43,14 @@ class ReplacementService:
             vehicle_dto = self.vehicle_repository.find_active_by_id(vehicle_id)
         if not vehicle_dto:
             raise ValueError(_MSG_VEHICLE_NOT_FOUND.format(vehicle_id=vehicle_id))
+
+        self._validate_repair_cost_conflict(
+            vehicle_id,
+            request.component_type,
+            request.replacement_date,
+            request.component_price,
+            request.work_price,
+        )
 
         is_date_based = request.component_type in DATE_BASED_COMPONENT_TYPES
         is_date_only = request.component_type in DATE_ONLY_COMPONENT_TYPES
@@ -192,7 +205,25 @@ class ReplacementService:
             kwargs.pop('work_price', None)
 
         new_km = kwargs.get('km_at_replacement')
-        new_date = kwargs.get('replacement_date')
+        new_date: date = kwargs.get('replacement_date') or replacement.replacement_date
+        new_component_price = (
+            kwargs.get('component_price')
+            if kwargs.get('component_price') is not None
+            else replacement.component_price
+        )
+        new_work_price = (
+            kwargs.get('work_price')
+            if kwargs.get('work_price') is not None
+            else replacement.work_price
+        )
+
+        self._validate_repair_cost_conflict(
+            replacement.vehicle_id,
+            replacement.component_type,
+            new_date,
+            new_component_price,
+            new_work_price,
+        )
         reset_date_notify = False
 
         if is_date_only:
@@ -271,6 +302,80 @@ class ReplacementService:
     def reset_date_notify_flags(self, vehicle_id: int) -> int:
         """Сбросить флаги date-уведомлений для non-tire замен автомобиля."""
         return self.repository.reset_date_notify_flags(vehicle_id)  # type: ignore[no-any-return]
+
+    def create_repair_placeholder(
+        self,
+        vehicle_dto: VehicleDTO,
+        component_type: ComponentType,
+        replacement_date: date,
+        km_at_replacement: int,
+        source_repair_id: int,
+        commit: bool = True,
+    ) -> ReplacementDTO:
+        """Создать служебную замену для компонента ремонта без проверки хронологии."""
+        if component_type in DATE_BASED_COMPONENT_TYPES:
+            raise ValueError('Для этого компонента нельзя создать замену из ремонта')
+        if vehicle_dto.id is None:
+            raise ValueError(_MSG_VEHICLE_NOT_FOUND.format(vehicle_id='?'))
+
+        self._validate_common(km_at_replacement, replacement_date)
+
+        interval_km = ComponentIntervalUtils.get_interval_for_component(
+            vehicle_dto, component_type,
+        )
+        interval_months = ComponentIntervalUtils.get_interval_months_for_component(
+            vehicle_dto, component_type,
+        )
+        next_change_date = None
+        if interval_months is not None:
+            next_change_date = add_months(replacement_date, interval_months)
+
+        replacement = ReplacementDTO(
+            id=None,
+            vehicle_id=vehicle_dto.id,
+            component_type=component_type,
+            component_name=REPAIR_PLACEHOLDER_NAME,
+            component_price=0,
+            work_price=0,
+            replacement_date=replacement_date,
+            km_at_replacement=km_at_replacement,
+            interval_km=interval_km,
+            interval_months=interval_months,
+            next_change_date=next_change_date,
+            source_repair_id=source_repair_id,
+        )
+        return self.repository.save(replacement, commit=commit)
+
+    def _validate_repair_cost_conflict(
+        self,
+        vehicle_id: int,
+        component_type: ComponentType,
+        replacement_date: date,
+        component_price: int | None,
+        work_price: int | None,
+    ) -> None:
+        """Запретить стоимость замены, если компонент входит в ремонт на эту дату."""
+        has_price = (
+            isinstance(component_price, int) and component_price > 0
+        ) or (
+            isinstance(work_price, int) and work_price > 0
+        )
+        if not has_price:
+            return
+
+        repair_repository = getattr(self, 'repair_repository', None)
+        if repair_repository is None:
+            return
+
+        repair = repair_repository.find_repair_for_replacement(
+            vehicle_id,
+            component_type,
+            replacement_date,
+        )
+        if repair:
+            raise ValueError(
+                _MSG_REPAIR_COST_CONFLICT.format(date=repair.repair_date)
+            )
 
     def _validate_common(
         self,

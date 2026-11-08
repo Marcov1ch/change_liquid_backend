@@ -1,4 +1,15 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Float
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime, timezone
 
@@ -109,6 +120,11 @@ class VehicleDB(Base):  # type: ignore
         back_populates="vehicle",
         cascade="all, delete-orphan",
     )
+    repairs = relationship(
+        "RepairDB",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+    )
 
 
 class VehicleSizeDB(Base):  # type: ignore
@@ -159,6 +175,13 @@ class ReplacementDB(Base):  # type: ignore
     date_warning_notified = Column(Boolean, default=False)
     date_overdue_notified = Column(Boolean, default=False)
 
+    source_repair_id = Column(
+        Integer,
+        ForeignKey("repairs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     vehicle = relationship("VehicleDB", back_populates="replacements")
 
 
@@ -174,3 +197,49 @@ class OtherExpenseDB(Base):  # type: ignore
     amount = Column(Integer, nullable=False)
 
     vehicle = relationship("VehicleDB", back_populates="other_expenses")
+
+
+class RepairDB(Base):  # type: ignore
+    """Ремонт или обслуживание автомобиля."""
+
+    __tablename__ = "repairs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(
+        Integer,
+        ForeignKey("vehicles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    repair_date = Column(Date, nullable=False, index=True)
+    km_at_repair = Column(Integer, nullable=False)
+    description = Column(Text, nullable=True)
+    work_cost = Column(Integer, nullable=False, default=0, server_default="0")
+    parts_cost = Column(Integer, nullable=False, default=0, server_default="0")
+
+    vehicle = relationship("VehicleDB", back_populates="repairs")
+    components = relationship(
+        "RepairComponentDB",
+        back_populates="repair",
+        cascade="all, delete-orphan",
+    )
+
+
+class RepairComponentDB(Base):  # type: ignore
+    """Выбранный km-based компонент ремонта."""
+
+    __tablename__ = "repair_components"
+    __table_args__ = (
+        UniqueConstraint("repair_id", "component_type", name="uq_repair_component"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    repair_id = Column(
+        Integer,
+        ForeignKey("repairs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    component_type = Column(String, nullable=False)
+
+    repair = relationship("RepairDB", back_populates="components")
