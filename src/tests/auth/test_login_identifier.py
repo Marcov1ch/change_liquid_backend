@@ -8,11 +8,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.requests import Request
 
-import app.auth.handler as auth_handler
-from app.auth.handler import _find_user_by_identifier, _normalize_identifier, login, register
 from app.auth.jwt import verify_token
 from app.auth.password import hash_password
+from app.auth.rate_limit import failed_attempts
+from app.auth.routes.registration import register
+from app.auth.routes.session import login
 from app.auth.schemas import ForgotPasswordRequest, UpdateEmailRequest, UserCreate
+from app.auth.user_service import find_user_by_identifier, normalize_identifier
 from app.db.models import Base, UserDB
 
 
@@ -27,7 +29,7 @@ def db_session() -> Iterator[Session]:
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_store() -> None:
-    auth_handler.failed_attempts.clear()
+    failed_attempts.clear()
 
 
 def _add_user(
@@ -72,13 +74,13 @@ class TestFindUserByIdentifier:
     def test_finds_by_username(self, db_session: Session) -> None:
         user = _add_user(db_session, 'alice', 'alice@example.com')
 
-        assert _find_user_by_identifier(db_session, 'alice') is not None
-        assert _find_user_by_identifier(db_session, 'alice').id == user.id  # type: ignore[union-attr]
+        assert find_user_by_identifier(db_session, 'alice') is not None
+        assert find_user_by_identifier(db_session, 'alice').id == user.id  # type: ignore[union-attr]
 
     def test_finds_by_email(self, db_session: Session) -> None:
         user = _add_user(db_session, 'alice', 'alice@example.com')
 
-        found = _find_user_by_identifier(db_session, 'alice@example.com')
+        found = find_user_by_identifier(db_session, 'alice@example.com')
 
         assert found is not None
         assert found.id == user.id
@@ -86,7 +88,7 @@ class TestFindUserByIdentifier:
     def test_finds_by_email_case_insensitive(self, db_session: Session) -> None:
         user = _add_user(db_session, 'alice', 'alice@example.com')
 
-        found = _find_user_by_identifier(db_session, 'ALICE@EXAMPLE.COM')
+        found = find_user_by_identifier(db_session, 'ALICE@EXAMPLE.COM')
 
         assert found is not None
         assert found.id == user.id
@@ -94,7 +96,7 @@ class TestFindUserByIdentifier:
     def test_finds_by_email_with_spaces(self, db_session: Session) -> None:
         user = _add_user(db_session, 'alice', 'alice@example.com')
 
-        found = _find_user_by_identifier(db_session, '  alice@example.com  ')
+        found = find_user_by_identifier(db_session, '  alice@example.com  ')
 
         assert found is not None
         assert found.id == user.id
@@ -103,13 +105,13 @@ class TestFindUserByIdentifier:
         by_username = _add_user(db_session, 'same@example.com', 'first@example.com')
         _add_user(db_session, 'second', 'same@example.com')
 
-        found = _find_user_by_identifier(db_session, 'same@example.com')
+        found = find_user_by_identifier(db_session, 'same@example.com')
 
         assert found is not None
         assert found.id == by_username.id
 
     def test_returns_none_for_unknown_identifier(self, db_session: Session) -> None:
-        assert _find_user_by_identifier(db_session, 'nobody') is None
+        assert find_user_by_identifier(db_session, 'nobody') is None
 
 
 class TestLoginByIdentifier:
@@ -156,7 +158,7 @@ class TestLoginByIdentifier:
         assert exc.value.status_code == 401
 
     def test_rate_limit_key_is_case_insensitive(self) -> None:
-        assert _normalize_identifier('  Alice@Example.COM ') == 'alice@example.com'
+        assert normalize_identifier('  Alice@Example.COM ') == 'alice@example.com'
 
 
 class TestEmailNormalization:

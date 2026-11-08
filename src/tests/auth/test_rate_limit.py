@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 import pytest
 from starlette.requests import Request
 
-import app.auth.handler as auth_handler
-from app.auth.handler import (
+import app.auth.rate_limit as rate_limit
+from app.auth.rate_limit import (
     _client_ip,
     add_failed_attempt,
     check_rate_limit,
@@ -16,7 +16,7 @@ from app.auth.handler import (
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_store(monkeypatch: pytest.MonkeyPatch) -> None:
     failed_attempts.clear()
-    monkeypatch.setattr(auth_handler, "_last_cleanup", time.monotonic())
+    monkeypatch.setattr(rate_limit, "_last_cleanup", time.monotonic())
 
 
 def _make_request(
@@ -78,7 +78,7 @@ class TestRateLimit:
             def now(cls, tz=None):
                 return cls.current
 
-        monkeypatch.setattr(auth_handler, "datetime", FakeDatetime)
+        monkeypatch.setattr(rate_limit, "datetime", FakeDatetime)
 
         key = "1.2.3.4:user"
         add_failed_attempt(key)
@@ -92,7 +92,7 @@ class TestRateLimit:
         assert check_rate_limit(key) is True
 
     def test_store_bounded_by_max_keys(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(auth_handler, "_RATE_LIMIT_MAX_KEYS", 3)
+        monkeypatch.setattr(rate_limit, "_RATE_LIMIT_MAX_KEYS", 3)
         for i in range(3):
             add_failed_attempt(f"ip{i}:user")
 
