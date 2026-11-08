@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.repair.schema import RepairCreateRequest
-from app.api.replacement.schema import ReplacementCreateRequest
+from app.api.replacement.schema import ReplacementCreateRequest, UpdateReplacementRequest
 from app.common.enums import ComponentType
 from app.db.models import Base, BrandDB, ModelDB, VehicleDB
 from app.repository.replacement_repository import ReplacementRepository
@@ -355,7 +355,10 @@ class TestReplacementConflict:
         linked = _linked(db_session, repair.id)
 
         service = ReplacementService(db_session)
-        updated = service.update(linked[0].id, component_price=0)  # type: ignore[arg-type]
+        updated = service.update(
+            linked[0].id,  # type: ignore[arg-type]
+            UpdateReplacementRequest(component_price=0),
+        )
 
         assert updated is not None
         assert updated.component_price == 0

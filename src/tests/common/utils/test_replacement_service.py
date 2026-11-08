@@ -3,9 +3,36 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.api.replacement.schema import (
+    ReplacementCreateRequest,
+    UpdateReplacementRequest,
+)
 from app.common.enums import ComponentType
 from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
+
+
+def _create_request(**overrides: object) -> ReplacementCreateRequest:
+    values: dict[str, object] = {
+        'component_type': ComponentType.ENGINE_OIL,
+        'component_name': 'Mobil 1',
+        'component_price': 0,
+        'work_price': 0,
+        'replacement_date': date(2024, 1, 1),
+        'km_at_replacement': 10000,
+        'next_change_date': None,
+    }
+    values.update(overrides)
+    return ReplacementCreateRequest.model_construct(**values)
+
+
+def _make_service() -> ReplacementService:
+    service = ReplacementService.__new__(ReplacementService)
+    service.repository = MagicMock()
+    service.vehicle_repository = MagicMock()
+    service.repair_repository = MagicMock()
+    service.repair_repository.find_repair_for_replacement.return_value = None
+    return service
 
 
 @pytest.fixture
@@ -28,14 +55,15 @@ def test_raises_on_duplicate(
     mock_common: MagicMock,
     vehicle_dto: VehicleDTO,
 ) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.ENGINE_OIL
-    request.km_at_replacement = 10000
-    request.component_name = 'Mobil 1'
-    request.replacement_date = date(2024, 1, 1)
-    request.component_price = 0
-    request.work_price = 0
-    request.next_change_date = None
+    request = _create_request(
+        component_type=ComponentType.ENGINE_OIL,
+        km_at_replacement=10000,
+        component_name='Mobil 1',
+        replacement_date=date(2024, 1, 1),
+        component_price=0,
+        work_price=0,
+        next_change_date=None,
+    )
 
     existing = ReplacementDTO(
         id=1, vehicle_id=1,
@@ -48,8 +76,7 @@ def test_raises_on_duplicate(
         interval_km=7000,
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.find_by_vehicle_component_and_km.return_value = existing
 
     with pytest.raises(ValueError, match='уже существует'):
@@ -65,15 +92,15 @@ def test_no_error_on_different_km(
     mock_common: MagicMock,
     vehicle_dto: VehicleDTO,
 ) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.ENGINE_OIL
-    request.km_at_replacement = 15000
-    request.component_name = 'Mobil 1'
-    request.replacement_date = date(2024, 6, 1)
-    request.component_price = 0
-    request.work_price = 0
-    request.interval_km = 7000
-    request.next_change_date = None
+    request = _create_request(
+        component_type=ComponentType.ENGINE_OIL,
+        km_at_replacement=15000,
+        component_name='Mobil 1',
+        replacement_date=date(2024, 6, 1),
+        component_price=0,
+        work_price=0,
+        next_change_date=None,
+    )
 
     existing = ReplacementDTO(
         id=1, vehicle_id=1,
@@ -95,8 +122,7 @@ def test_no_error_on_different_km(
             return existing
         return None
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.find_by_vehicle_component_and_km.side_effect = _find_by_km
     service.vehicle_repository = MagicMock()
     saved = ReplacementDTO(
@@ -133,14 +159,15 @@ def test_create_computes_next_change_date_from_vehicle_months(
         interval_months={'engine_oil': 12},
     )
 
-    request = MagicMock()
-    request.component_type = ComponentType.ENGINE_OIL
-    request.km_at_replacement = 15000
-    request.component_name = 'Mobil 1'
-    request.replacement_date = date(2026, 1, 15)
-    request.component_price = 0
-    request.work_price = 0
-    request.next_change_date = None
+    request = _create_request(
+        component_type=ComponentType.ENGINE_OIL,
+        km_at_replacement=15000,
+        component_name='Mobil 1',
+        replacement_date=date(2026, 1, 15),
+        component_price=0,
+        work_price=0,
+        next_change_date=None,
+    )
 
     saved = ReplacementDTO(
         id=2, vehicle_id=1,
@@ -155,8 +182,7 @@ def test_create_computes_next_change_date_from_vehicle_months(
         next_change_date=date(2027, 1, 15),
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.find_by_vehicle_component_and_km.return_value = None
     service.vehicle_repository = MagicMock()
     service.repository.save.return_value = saved
@@ -168,12 +194,12 @@ def test_create_computes_next_change_date_from_vehicle_months(
 
 
 def test_create_insurance_requires_next_change_date(vehicle_dto: VehicleDTO) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.INSURANCE
-    request.next_change_date = None
+    request = _create_request(
+        component_type=ComponentType.INSURANCE,
+        next_change_date=None,
+    )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.vehicle_repository = MagicMock()
 
     with pytest.raises(ValueError, match='дату окончания'):
@@ -183,14 +209,15 @@ def test_create_insurance_requires_next_change_date(vehicle_dto: VehicleDTO) -> 
 
 
 def test_create_insurance_stores_zero_km_and_no_work_price(vehicle_dto: VehicleDTO) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.INSURANCE
-    request.km_at_replacement = 999
-    request.component_name = 'ОСАГО'
-    request.replacement_date = date(2026, 1, 15)
-    request.component_price = 12000
-    request.work_price = 500
-    request.next_change_date = date(2027, 1, 15)
+    request = _create_request(
+        component_type=ComponentType.INSURANCE,
+        km_at_replacement=999,
+        component_name='ОСАГО',
+        replacement_date=date(2026, 1, 15),
+        component_price=12000,
+        work_price=500,
+        next_change_date=date(2027, 1, 15),
+    )
 
     saved = ReplacementDTO(
         id=2, vehicle_id=1,
@@ -204,8 +231,7 @@ def test_create_insurance_stores_zero_km_and_no_work_price(vehicle_dto: VehicleD
         next_change_date=date(2027, 1, 15),
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.save.return_value = saved
     service.vehicle_repository = MagicMock()
 
@@ -243,8 +269,7 @@ def test_get_tire_km_traveled_counts_between_records() -> None:
         interval_km=0,
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.find_by_vehicle_and_component.return_value = [second, first]
 
     result = service.get_tire_km_traveled(1, 18000)
@@ -253,8 +278,7 @@ def test_get_tire_km_traveled_counts_between_records() -> None:
 
 
 def test_reset_date_notify_flags_delegates_to_repository() -> None:
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.reset_date_notify_flags.return_value = 3
 
     result = service.reset_date_notify_flags(1)
@@ -263,12 +287,12 @@ def test_reset_date_notify_flags_delegates_to_repository() -> None:
 
 
 def test_create_parking_requires_next_change_date(vehicle_dto: VehicleDTO) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.PARKING_MONTHLY
-    request.next_change_date = None
+    request = _create_request(
+        component_type=ComponentType.PARKING_MONTHLY,
+        next_change_date=None,
+    )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.vehicle_repository = MagicMock()
 
     with pytest.raises(ValueError, match='дату окончания'):
@@ -278,13 +302,13 @@ def test_create_parking_requires_next_change_date(vehicle_dto: VehicleDTO) -> No
 
 
 def test_create_parking_rejects_end_before_start(vehicle_dto: VehicleDTO) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.PARKING_MONTHLY
-    request.replacement_date = date(2026, 2, 1)
-    request.next_change_date = date(2026, 1, 31)
+    request = _create_request(
+        component_type=ComponentType.PARKING_MONTHLY,
+        replacement_date=date(2026, 2, 1),
+        next_change_date=date(2026, 1, 31),
+    )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.vehicle_repository = MagicMock()
 
     with pytest.raises(ValueError, match='не может быть раньше'):
@@ -294,14 +318,15 @@ def test_create_parking_rejects_end_before_start(vehicle_dto: VehicleDTO) -> Non
 
 
 def test_create_parking_stores_zero_km_and_no_work_price(vehicle_dto: VehicleDTO) -> None:
-    request = MagicMock()
-    request.component_type = ComponentType.PARKING_MONTHLY
-    request.km_at_replacement = 999
-    request.component_name = 'Машиноместо № 12'
-    request.replacement_date = date(2026, 1, 15)
-    request.component_price = 8000
-    request.work_price = 500
-    request.next_change_date = date(2026, 2, 15)
+    request = _create_request(
+        component_type=ComponentType.PARKING_MONTHLY,
+        km_at_replacement=999,
+        component_name='Машиноместо № 12',
+        replacement_date=date(2026, 1, 15),
+        component_price=8000,
+        work_price=500,
+        next_change_date=date(2026, 2, 15),
+    )
 
     saved = ReplacementDTO(
         id=2, vehicle_id=1,
@@ -315,8 +340,7 @@ def test_create_parking_stores_zero_km_and_no_work_price(vehicle_dto: VehicleDTO
         next_change_date=date(2026, 2, 15),
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.save.return_value = saved
     service.vehicle_repository = MagicMock()
 
@@ -345,8 +369,7 @@ def test_update_parking_ignores_km_and_work_price(vehicle_dto: VehicleDTO) -> No
         next_change_date=date(2026, 2, 15),
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.find_by_id.return_value = replacement
     service.repository.save.return_value = replacement
     service.vehicle_repository = MagicMock()
@@ -354,9 +377,11 @@ def test_update_parking_ignores_km_and_work_price(vehicle_dto: VehicleDTO) -> No
 
     service.update(
         2,
-        km_at_replacement=999,
-        work_price=500,
-        component_name='Новое место',
+        UpdateReplacementRequest(
+            km_at_replacement=999,
+            work_price=500,
+            component_name='Новое место',
+        ),
     )
 
     assert replacement.km_at_replacement == 0
@@ -377,14 +402,16 @@ def test_update_parking_resets_date_flags_when_next_date_changes(vehicle_dto: Ve
         next_change_date=date(2026, 2, 15),
     )
 
-    service = ReplacementService.__new__(ReplacementService)
-    service.repository = MagicMock()
+    service = _make_service()
     service.repository.find_by_id.return_value = replacement
     service.repository.save.return_value = replacement
     service.vehicle_repository = MagicMock()
     service.vehicle_repository.find_active_by_id.return_value = vehicle_dto
 
-    service.update(2, next_change_date=date(2026, 3, 15))
+    service.update(
+        2,
+        UpdateReplacementRequest(next_change_date=date(2026, 3, 15)),
+    )
 
     service.repository.update_date_notify_tracking.assert_called_once_with(
         2,
