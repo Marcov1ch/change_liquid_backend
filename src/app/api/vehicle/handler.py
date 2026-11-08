@@ -20,6 +20,7 @@ from app.db.database import get_db
 from app.db.models import UserDB
 from app.auth.jwt import get_current_user
 from app.services.replacement_service import ReplacementService
+from app.services.other_expense_service import OtherExpenseService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import StatusCalculator
@@ -356,15 +357,17 @@ class VehicleHandler:
         """Полное удаление авто из БД."""
         vehicle_service = VehicleService(db)
         replacement_service = ReplacementService(db)
+        other_expense_service = OtherExpenseService(db)
 
         try:
             replacement_service.delete_by_vehicle(vehicle.id, commit=False)
+            other_expense_service.delete_by_vehicle(vehicle.id, commit=False)
             vehicle_service.hard_delete(vehicle.id, commit=False)
             db.commit()
 
             return {
                 'status': 'ok',
-                'message': f'Автомобиль {vehicle.id} и все его замены полностью удалены',
+                'message': f'Автомобиль {vehicle.id} и все его записи полностью удалены',
             }
         except HTTPException:
             db.rollback()

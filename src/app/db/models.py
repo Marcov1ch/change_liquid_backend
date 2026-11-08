@@ -104,6 +104,11 @@ class VehicleDB(Base):  # type: ignore
 
     replacements = relationship("ReplacementDB", back_populates="vehicle")
     sizes = relationship("VehicleSizeDB", backref="vehicle", cascade="all, delete-orphan")
+    other_expenses = relationship(
+        "OtherExpenseDB",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+    )
 
 
 class VehicleSizeDB(Base):  # type: ignore
@@ -155,3 +160,17 @@ class ReplacementDB(Base):  # type: ignore
     date_overdue_notified = Column(Boolean, default=False)
 
     vehicle = relationship("VehicleDB", back_populates="replacements")
+
+
+class OtherExpenseDB(Base):  # type: ignore
+    """Прочая трата на автомобиль."""
+
+    __tablename__ = "other_expenses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    expense_date = Column(Date, nullable=False, index=True)
+    amount = Column(Integer, nullable=False)
+
+    vehicle = relationship("VehicleDB", back_populates="other_expenses")
