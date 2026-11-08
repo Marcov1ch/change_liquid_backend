@@ -12,7 +12,14 @@ from app.services.vehicle_service import VehicleService
 from app.services.replacement_service import ReplacementService
 from app.services.other_expense_service import OtherExpenseService
 from app.services.repair_service import RepairService
-from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO, RepairDTO
+from app.services.fuel_record_service import FuelRecordService
+from app.services.dto import (
+    VehicleDTO,
+    ReplacementDTO,
+    OtherExpenseDTO,
+    RepairDTO,
+    FuelRecordDTO,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,7 @@ _MSG_VEHICLE_ARCHIVED = 'Автомобиль находится в архиве
 _MSG_REPLACEMENT_NOT_FOUND = 'Замена не найдена'
 _MSG_OTHER_EXPENSE_NOT_FOUND = 'Трата не найдена'
 _MSG_REPAIR_NOT_FOUND = 'Ремонт не найден'
+_MSG_FUEL_RECORD_NOT_FOUND = 'Заправка не найдена'
 _MSG_ACCESS_DENIED = 'Доступ запрещён'
 
 
@@ -228,3 +236,52 @@ def verify_repair_view_access(
 ) -> RepairDTO:
     """Проверка доступа к ремонту; просмотр ремонтов архивного авто разрешён."""
     return _verify_repair_access(db, current_user, repair_id, require_active=False)
+
+
+def _verify_fuel_record_access(
+    db: Session,
+    current_user: UserDB,
+    record_id: int,
+    require_active: bool,
+) -> FuelRecordDTO:
+    fuel_service = FuelRecordService(db)
+    vehicle_service = VehicleService(db)
+
+    record = fuel_service.get_by_id(record_id)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_MSG_FUEL_RECORD_NOT_FOUND,
+        )
+
+    vehicle = vehicle_service.get_by_id(record.vehicle_id)
+    if not vehicle or vehicle.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_MSG_ACCESS_DENIED,
+        )
+    if require_active and not vehicle.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_MSG_VEHICLE_ARCHIVED,
+        )
+
+    return record
+
+
+def verify_fuel_record_access(
+    record_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> FuelRecordDTO:
+    """Проверка доступа к заправке; операции с архивным авто запрещены."""
+    return _verify_fuel_record_access(db, current_user, record_id, require_active=True)
+
+
+def verify_fuel_record_view_access(
+    record_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> FuelRecordDTO:
+    """Проверка доступа к заправке; просмотр заправок архивного авто разрешён."""
+    return _verify_fuel_record_access(db, current_user, record_id, require_active=False)

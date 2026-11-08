@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.replacement.mapper import build_replacement_response
 from app.api.share.schema import (
+    PublicFuelRecordResponse,
     PublicOtherExpenseResponse,
     PublicRepairResponse,
     PublicReplacementResponse,
@@ -16,6 +17,7 @@ from app.common.middleware import verify_vehicle_view_access
 from app.common.utils.calculator import StatusCalculator
 from app.db.database import get_db
 from app.services.dto import VehicleDTO
+from app.services.fuel_record_service import FuelRecordService
 from app.services.other_expense_service import OtherExpenseService
 from app.services.repair_service import RepairService
 from app.services.replacement_service import ReplacementService
@@ -145,6 +147,19 @@ class ShareHandler:
                 for expense in other_expense_service.get_by_vehicle(vehicle.id)
             ]
 
+            fuel_record_service = FuelRecordService(db)
+            public_fuel_records = [
+                PublicFuelRecordResponse(
+                    id=record.id,
+                    fuel_date=record.fuel_date,
+                    km_at_fuel=record.km_at_fuel,
+                    liters=record.liters,
+                    total_cost=record.total_cost,
+                    consumption_l_per_100km=record.consumption_l_per_100km,
+                )
+                for record in fuel_record_service.get_by_vehicle(vehicle.id)
+            ]
+
             repair_service = RepairService(db)
             public_repairs = [
                 PublicRepairResponse(
@@ -169,6 +184,7 @@ class ShareHandler:
                 replacements=public_replacements,
                 other_expenses=public_other_expenses,
                 repairs=public_repairs,
+                fuel_records=public_fuel_records,
                 register_url=build_register_url(),
             )
         except HTTPException:

@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter
 
 from app.api.vehicle.handler import vehicle_handler
 from app.api.replacement.handler import replacement_handler
+from app.api.fuel_record.handler import fuel_record_handler
 from app.api.other_expense.handler import other_expense_handler
 from app.api.repair.handler import repair_handler
 from app.api.enums.handler import enums_handler
@@ -110,6 +111,38 @@ def setup_routes(app: FastAPI) -> None:
         replacement_handler.create_replacements,
         methods=["POST"],
         tags=["replacements"]
+    )
+
+    # Маршруты для заправок
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/fuel-records",
+        fuel_record_handler.get_vehicle_fuel_records,
+        methods=["GET"],
+        tags=["fuel-records"]
+    )
+    router.add_api_route(
+        "/vehicles/{vehicle_id}/fuel-records",
+        fuel_record_handler.create_fuel_record,
+        methods=["POST"],
+        tags=["fuel-records"]
+    )
+    router.add_api_route(
+        "/fuel-records/{record_id}",
+        fuel_record_handler.get_fuel_record,
+        methods=["GET"],
+        tags=["fuel-records"]
+    )
+    router.add_api_route(
+        "/fuel-records/{record_id}",
+        fuel_record_handler.update_fuel_record,
+        methods=["PATCH"],
+        tags=["fuel-records"]
+    )
+    router.add_api_route(
+        "/fuel-records/{record_id}",
+        fuel_record_handler.delete_fuel_record,
+        methods=["DELETE"],
+        tags=["fuel-records"]
     )
 
     # Маршруты для прочих трат
