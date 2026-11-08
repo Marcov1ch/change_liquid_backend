@@ -125,6 +125,11 @@ class VehicleDB(Base):  # type: ignore
         back_populates="vehicle",
         cascade="all, delete-orphan",
     )
+    fuel_records = relationship(
+        "FuelRecordDB",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+    )
 
 
 class VehicleSizeDB(Base):  # type: ignore
@@ -243,3 +248,23 @@ class RepairComponentDB(Base):  # type: ignore
     component_type = Column(String, nullable=False)
 
     repair = relationship("RepairDB", back_populates="components")
+
+
+class FuelRecordDB(Base):  # type: ignore
+    """Запись о заправке автомобиля."""
+
+    __tablename__ = "fuel_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(
+        Integer,
+        ForeignKey("vehicles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    fuel_date = Column(Date, nullable=False, index=True)
+    km_at_fuel = Column(Integer, nullable=False)
+    liters = Column(Float, nullable=False)
+    total_cost = Column(Integer, nullable=False)
+
+    vehicle = relationship("VehicleDB", back_populates="fuel_records")

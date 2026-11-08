@@ -7,7 +7,13 @@ from fastapi import HTTPException
 
 from app.api.share.handler import ShareHandler
 from app.common.enums import ComponentType, StatusEnum
-from app.services.dto import OtherExpenseDTO, RepairDTO, ReplacementDTO, VehicleDTO
+from app.services.dto import (
+    FuelRecordDTO,
+    OtherExpenseDTO,
+    RepairDTO,
+    ReplacementDTO,
+    VehicleDTO,
+)
 
 
 def _vehicle(share_token: str | None = 'tok') -> VehicleDTO:
@@ -62,6 +68,7 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
         patch('app.api.share.handler.ReplacementService') as replacement_service_cls,
         patch('app.api.share.handler.OtherExpenseService') as other_expense_service_cls,
         patch('app.api.share.handler.RepairService') as repair_service_cls,
+        patch('app.api.share.handler.FuelRecordService') as fuel_service_cls,
         patch('app.api.share.handler.build_register_url', return_value='http://front/register'),
     ):
         share_service_cls.return_value.find_by_token.return_value = _vehicle()
@@ -89,6 +96,17 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
                 component_types=[ComponentType.ENGINE_OIL],
             ),
         ]
+        fuel_service_cls.return_value.get_by_vehicle.return_value = [
+            FuelRecordDTO(
+                id=1,
+                vehicle_id=1,
+                fuel_date=date(2026, 1, 19),
+                km_at_fuel=14500,
+                liters=35.5,
+                total_cost=2500,
+                consumption_l_per_100km=7.1,
+            ),
+        ]
 
         response = asyncio.run(
             ShareHandler().get_public_vehicle('tok', db=MagicMock())
@@ -111,6 +129,10 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
     assert response.repairs[0].work_cost == 2000
     assert response.repairs[0].parts_cost == 5000
     assert not hasattr(response.repairs[0], 'vehicle_id')
+    assert len(response.fuel_records) == 1
+    assert response.fuel_records[0].liters == 35.5
+    assert response.fuel_records[0].consumption_l_per_100km == 7.1
+    assert not hasattr(response.fuel_records[0], 'vehicle_id')
 
 
 def test_public_vehicle_not_found() -> None:

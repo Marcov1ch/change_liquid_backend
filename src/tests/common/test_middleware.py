@@ -18,8 +18,16 @@ from app.common.middleware import (
     verify_other_expense_view_access,
     verify_repair_access,
     verify_repair_view_access,
+    verify_fuel_record_access,
+    verify_fuel_record_view_access,
 )
-from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO, RepairDTO
+from app.services.dto import (
+    VehicleDTO,
+    ReplacementDTO,
+    OtherExpenseDTO,
+    RepairDTO,
+    FuelRecordDTO,
+)
 
 
 @pytest.fixture
@@ -509,6 +517,120 @@ class TestVerifyRepairAccess:
             )
 
         assert result is repair
+
+
+class TestVerifyFuelRecordAccess:
+
+    def _record(self) -> FuelRecordDTO:
+        return FuelRecordDTO(
+            id=1, vehicle_id=1, fuel_date=date(2026, 1, 15),
+            km_at_fuel=15000, liters=35.5, total_cost=2500,
+        )
+
+    def test_returns_record_when_owner_matches(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        record = self._record()
+
+        with (
+            patch('app.common.middleware.FuelRecordService') as fuel_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            fuel_service.return_value.get_by_id.return_value = record
+            vehicle_service.return_value.get_by_id.return_value = vehicle_dto
+
+            result = verify_fuel_record_access(
+                record_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is record
+        fuel_service.return_value.get_by_id.assert_called_once_with(1)
+
+    def test_raises_404_when_record_not_found(self) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with patch('app.common.middleware.FuelRecordService') as fuel_service:
+            fuel_service.return_value.get_by_id.return_value = None
+
+            with pytest.raises(HTTPException) as exc:
+                verify_fuel_record_access(
+                    record_id=999, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 404
+        assert exc.value.detail == 'Заправка не найдена'
+
+    def test_raises_403_when_owner_does_not_match(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 99
+
+        with (
+            patch('app.common.middleware.FuelRecordService') as fuel_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            fuel_service.return_value.get_by_id.return_value = self._record()
+            vehicle_service.return_value.get_by_id.return_value = vehicle_dto
+
+            with pytest.raises(HTTPException) as exc:
+                verify_fuel_record_access(
+                    record_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 403
+
+    def test_raises_409_when_vehicle_archived(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with (
+            patch('app.common.middleware.FuelRecordService') as fuel_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            fuel_service.return_value.get_by_id.return_value = self._record()
+            vehicle_service.return_value.get_by_id.return_value = dataclasses.replace(
+                vehicle_dto, is_active=False,
+            )
+
+            with pytest.raises(HTTPException) as exc:
+                verify_fuel_record_access(
+                    record_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 409
+
+    def test_view_allows_archived_vehicle(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        record = self._record()
+
+        with (
+            patch('app.common.middleware.FuelRecordService') as fuel_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            fuel_service.return_value.get_by_id.return_value = record
+            vehicle_service.return_value.get_by_id.return_value = dataclasses.replace(
+                vehicle_dto, is_active=False,
+            )
+
+            result = verify_fuel_record_view_access(
+                record_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is record
 
 
 class TestLoggingMiddleware:

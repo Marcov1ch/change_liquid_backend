@@ -137,6 +137,34 @@ class PublicRepairResponse(BaseModel):
     )
 
 
+class PublicFuelRecordResponse(BaseModel):
+    """Заправка в публичном профиле."""
+    id: int = Field(
+        ...,
+        description='ID заправки',
+    )
+    fuel_date: date = Field(
+        ...,
+        description='Дата заправки',
+    )
+    km_at_fuel: int = Field(
+        ...,
+        description='Пробег на момент заправки',
+    )
+    liters: float = Field(
+        ...,
+        description='Объём топлива в литрах',
+    )
+    total_cost: int = Field(
+        ...,
+        description='Стоимость заправки в рублях',
+    )
+    consumption_l_per_100km: float | None = Field(
+        None,
+        description='Расход топлива между соседними заправками, л/100 км',
+    )
+
+
 class PublicVehicleResponse(BaseModel):
     """Публичный профиль авто с историей замен."""
     brand: str = Field(
@@ -174,6 +202,10 @@ class PublicVehicleResponse(BaseModel):
     repairs: list[PublicRepairResponse] = Field(
         default_factory=list,
         description='Ремонты и обслуживание',
+    )
+    fuel_records: list[PublicFuelRecordResponse] = Field(
+        default_factory=list,
+        description='Заправки',
     )
     register_url: str = Field(
         ...,

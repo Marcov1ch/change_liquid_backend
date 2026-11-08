@@ -53,6 +53,18 @@ class ReplacementDTO:
 
 
 @dataclass
+class FuelRecordDTO:
+    """DTO для передачи данных о заправке."""
+    id: int | None
+    vehicle_id: int
+    fuel_date: date
+    km_at_fuel: int
+    liters: float
+    total_cost: int
+    consumption_l_per_100km: float | None = None
+
+
+@dataclass
 class RepairDTO:
     """DTO для передачи данных о ремонте."""
     id: int | None
