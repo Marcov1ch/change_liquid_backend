@@ -85,6 +85,26 @@ class PublicReplacementResponse(BaseModel):
     )
 
 
+class PublicOtherExpenseResponse(BaseModel):
+    """Прочая трата в публичном профиле."""
+    id: int = Field(
+        ...,
+        description='ID записи о трате',
+    )
+    name: str = Field(
+        ...,
+        description='Название траты',
+    )
+    expense_date: date = Field(
+        ...,
+        description='Дата траты',
+    )
+    amount: int = Field(
+        ...,
+        description='Стоимость траты в рублях',
+    )
+
+
 class PublicVehicleResponse(BaseModel):
     """Публичный профиль авто с историей замен."""
     brand: str = Field(
@@ -114,6 +134,10 @@ class PublicVehicleResponse(BaseModel):
     replacements: list[PublicReplacementResponse] = Field(
         default_factory=list,
         description='История замен',
+    )
+    other_expenses: list[PublicOtherExpenseResponse] = Field(
+        default_factory=list,
+        description='Прочие траты',
     )
     register_url: str = Field(
         ...,

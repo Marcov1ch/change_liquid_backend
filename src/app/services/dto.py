@@ -26,6 +26,16 @@ class VehicleDTO:
 
 
 @dataclass
+class OtherExpenseDTO:
+    """DTO для передачи данных о прочей трате."""
+    id: int | None
+    vehicle_id: int
+    name: str
+    expense_date: date
+    amount: int
+
+
+@dataclass
 class ReplacementDTO:
     """DTO для передачи данных о замене."""
     id: int | None

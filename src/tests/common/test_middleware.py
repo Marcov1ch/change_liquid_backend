@@ -14,8 +14,10 @@ from app.common.middleware import (
     verify_vehicle_view_access,
     verify_replacement_access,
     verify_replacement_view_access,
+    verify_other_expense_access,
+    verify_other_expense_view_access,
 )
-from app.services.dto import VehicleDTO, ReplacementDTO
+from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO
 
 
 @pytest.fixture
@@ -274,6 +276,122 @@ class TestVerifyReplacementAccessArchived:
             )
 
         assert result is replacement_dto
+
+
+class TestVerifyOtherExpenseAccess:
+
+    def _expense(self) -> OtherExpenseDTO:
+        return OtherExpenseDTO(
+            id=1, vehicle_id=1, name='Штраф',
+            expense_date=date(2026, 1, 15), amount=500,
+        )
+
+    def test_returns_expense_when_owner_matches(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        expense = self._expense()
+
+        with (
+            patch('app.common.middleware.OtherExpenseService') as expense_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            expense_service.return_value.get_by_id.return_value = expense
+            vehicle_service.return_value.get_by_id.return_value = vehicle_dto
+
+            result = verify_other_expense_access(
+                expense_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is expense
+        expense_service.return_value.get_by_id.assert_called_once_with(1)
+
+    def test_raises_404_when_expense_not_found(self) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with patch('app.common.middleware.OtherExpenseService') as expense_service:
+            expense_service.return_value.get_by_id.return_value = None
+
+            with pytest.raises(HTTPException) as exc:
+                verify_other_expense_access(
+                    expense_id=999, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 404
+        assert exc.value.detail == 'Трата не найдена'
+
+    def test_raises_403_when_owner_does_not_match(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 99
+
+        with (
+            patch('app.common.middleware.OtherExpenseService') as expense_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            expense_service.return_value.get_by_id.return_value = self._expense()
+            vehicle_service.return_value.get_by_id.return_value = vehicle_dto
+
+            with pytest.raises(HTTPException) as exc:
+                verify_other_expense_access(
+                    expense_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 403
+        assert exc.value.detail == 'Доступ запрещён'
+
+    def test_raises_409_when_vehicle_archived(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+
+        with (
+            patch('app.common.middleware.OtherExpenseService') as expense_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            expense_service.return_value.get_by_id.return_value = self._expense()
+            vehicle_service.return_value.get_by_id.return_value = dataclasses.replace(
+                vehicle_dto, is_active=False,
+            )
+
+            with pytest.raises(HTTPException) as exc:
+                verify_other_expense_access(
+                    expense_id=1, db=db, current_user=current_user,
+                )
+
+        assert exc.value.status_code == 409
+        assert exc.value.detail == 'Автомобиль находится в архиве'
+
+    def test_view_allows_archived_vehicle(
+        self, vehicle_dto: VehicleDTO,
+    ) -> None:
+        db = MagicMock()
+        current_user = MagicMock()
+        current_user.id = 42
+        expense = self._expense()
+
+        with (
+            patch('app.common.middleware.OtherExpenseService') as expense_service,
+            patch('app.common.middleware.VehicleService') as vehicle_service,
+        ):
+            expense_service.return_value.get_by_id.return_value = expense
+            vehicle_service.return_value.get_by_id.return_value = dataclasses.replace(
+                vehicle_dto, is_active=False,
+            )
+
+            result = verify_other_expense_view_access(
+                expense_id=1, db=db, current_user=current_user,
+            )
+
+        assert result is expense
 
 
 class TestLoggingMiddleware:

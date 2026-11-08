@@ -10,13 +10,15 @@ from app.auth.jwt import get_current_user
 from app.db.models import UserDB
 from app.services.vehicle_service import VehicleService
 from app.services.replacement_service import ReplacementService
-from app.services.dto import VehicleDTO, ReplacementDTO
+from app.services.other_expense_service import OtherExpenseService
+from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO
 
 logger = logging.getLogger(__name__)
 
 _MSG_VEHICLE_NOT_FOUND = 'Автомобиль не найден'
 _MSG_VEHICLE_ARCHIVED = 'Автомобиль находится в архиве'
 _MSG_REPLACEMENT_NOT_FOUND = 'Замена не найдена'
+_MSG_OTHER_EXPENSE_NOT_FOUND = 'Трата не найдена'
 _MSG_ACCESS_DENIED = 'Доступ запрещён'
 
 
@@ -126,3 +128,52 @@ def verify_replacement_view_access(
 ) -> ReplacementDTO:
     """Проверка доступа к замене; просмотр замен архивного авто разрешён."""
     return _verify_replacement_access(db, current_user, replacement_id, require_active=False)
+
+
+def _verify_other_expense_access(
+    db: Session,
+    current_user: UserDB,
+    expense_id: int,
+    require_active: bool,
+) -> OtherExpenseDTO:
+    expense_service = OtherExpenseService(db)
+    vehicle_service = VehicleService(db)
+
+    expense = expense_service.get_by_id(expense_id)
+    if not expense:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_MSG_OTHER_EXPENSE_NOT_FOUND,
+        )
+
+    vehicle = vehicle_service.get_by_id(expense.vehicle_id)
+    if not vehicle or vehicle.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_MSG_ACCESS_DENIED,
+        )
+    if require_active and not vehicle.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_MSG_VEHICLE_ARCHIVED,
+        )
+
+    return expense
+
+
+def verify_other_expense_access(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> OtherExpenseDTO:
+    """Проверка доступа к прочей трате; операции с архивным авто запрещены."""
+    return _verify_other_expense_access(db, current_user, expense_id, require_active=True)
+
+
+def verify_other_expense_view_access(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> OtherExpenseDTO:
+    """Проверка доступа к прочей трате; просмотр трат архивного авто разрешён."""
+    return _verify_other_expense_access(db, current_user, expense_id, require_active=False)
