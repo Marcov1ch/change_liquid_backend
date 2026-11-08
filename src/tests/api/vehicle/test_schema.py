@@ -28,6 +28,25 @@ def test_update_vehicle_data_year_validation(
             UpdateVehicleData(year=year)
 
 
+def test_update_vehicle_data_normalizes_plate_number() -> None:
+    payload = UpdateVehicleData(plate_number='  ab-123-cd  ')
+    assert payload.plate_number == 'AB-123-CD'
+
+
+def test_update_vehicle_data_plate_number_none_is_allowed() -> None:
+    assert UpdateVehicleData(plate_number=None).plate_number is None
+
+
+def test_update_vehicle_data_rejects_too_long_plate_number() -> None:
+    with pytest.raises(ValidationError):
+        UpdateVehicleData(plate_number='A' * 16)
+
+
+def test_update_vehicle_data_rejects_empty_plate_number() -> None:
+    with pytest.raises(ValidationError):
+        UpdateVehicleData(plate_number='   ')
+
+
 def test_rim_size_valid() -> None:
     rim = RimSize(
         diameter=16,
