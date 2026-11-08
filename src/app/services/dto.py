@@ -49,3 +49,17 @@ class ReplacementDTO:
     interval_km: int
     next_change_date: date | None = None
     interval_months: int | None = None
+    source_repair_id: int | None = None
+
+
+@dataclass
+class RepairDTO:
+    """DTO для передачи данных о ремонте."""
+    id: int | None
+    vehicle_id: int
+    repair_date: date
+    km_at_repair: int
+    description: str | None
+    work_cost: int
+    parts_cost: int
+    component_types: list[ComponentType]

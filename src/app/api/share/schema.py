@@ -105,6 +105,38 @@ class PublicOtherExpenseResponse(BaseModel):
     )
 
 
+class PublicRepairResponse(BaseModel):
+    """Ремонт в публичном профиле."""
+    id: int = Field(
+        ...,
+        description='ID ремонта',
+    )
+    repair_date: date = Field(
+        ...,
+        description='Дата ремонта',
+    )
+    km_at_repair: int = Field(
+        ...,
+        description='Пробег на момент ремонта',
+    )
+    description: str | None = Field(
+        None,
+        description='Описание работ',
+    )
+    work_cost: int = Field(
+        ...,
+        description='Стоимость работ',
+    )
+    parts_cost: int = Field(
+        ...,
+        description='Стоимость запчастей',
+    )
+    component_types: list[ComponentType] = Field(
+        default_factory=list,
+        description='Компоненты, заменённые в рамках ремонта',
+    )
+
+
 class PublicVehicleResponse(BaseModel):
     """Публичный профиль авто с историей замен."""
     brand: str = Field(
@@ -138,6 +170,10 @@ class PublicVehicleResponse(BaseModel):
     other_expenses: list[PublicOtherExpenseResponse] = Field(
         default_factory=list,
         description='Прочие траты',
+    )
+    repairs: list[PublicRepairResponse] = Field(
+        default_factory=list,
+        description='Ремонты и обслуживание',
     )
     register_url: str = Field(
         ...,

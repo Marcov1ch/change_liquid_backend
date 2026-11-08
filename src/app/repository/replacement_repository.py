@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from datetime import date
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
@@ -40,6 +41,7 @@ class ReplacementRepository:
             interval_km=db_row.interval_km,
             next_change_date=db_row.next_change_date,
             interval_months=db_row.interval_months,
+            source_repair_id=db_row.source_repair_id,
         )
 
     @staticmethod
@@ -137,6 +139,31 @@ class ReplacementRepository:
             ReplacementDB.component_type == component_type.value
         ).all()
 
+        return [self._to_dto(replacement) for replacement in db_replacements]
+
+    def find_by_vehicle_component_and_date(
+        self,
+        vehicle_id: int,
+        component_type: ComponentType,
+        replacement_date: date,
+    ) -> Optional[ReplacementDTO]:
+        """Найти замену по автомобилю, типу компонента и дате."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.component_type == component_type.value,
+            ReplacementDB.replacement_date == replacement_date,
+        ).first()
+
+        if not db_replacement:
+            return None
+
+        return self._to_dto(db_replacement)
+
+    def find_by_source_repair_id(self, repair_id: int) -> List[ReplacementDTO]:
+        """Найти все замены, созданные из ремонта."""
+        db_replacements = self.db.query(ReplacementDB).filter(
+            ReplacementDB.source_repair_id == repair_id
+        ).all()
         return [self._to_dto(replacement) for replacement in db_replacements]
 
     def find_by_vehicle_component_and_km(
@@ -340,16 +367,30 @@ class ReplacementRepository:
             self.db.commit()
         return count  # type: ignore[no-any-return]
 
-    def delete(self, replacement_id: int) -> bool:
+    def delete(self, replacement_id: int, commit: bool = True) -> bool:
         """Удалить запись о замене."""
         db_replacement = self.db.query(ReplacementDB).filter(
             ReplacementDB.id == replacement_id
         ).first()
         if db_replacement:
             self.db.delete(db_replacement)
-            self.db.commit()
+            if commit:
+                self.db.commit()
+            else:
+                self.db.flush()
             return True
         return False
+
+    def clear_source_repair_id(self, repair_id: int, commit: bool = True) -> int:
+        """Отвязать замены от удалённого или изменённого ремонта."""
+        count = self.db.query(ReplacementDB).filter(
+            ReplacementDB.source_repair_id == repair_id
+        ).update({ReplacementDB.source_repair_id: None})
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+        return count  # type: ignore[no-any-return]
 
     def delete_by_vehicle_id(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все замены для автомобиля. Возвращает количество удалённых."""

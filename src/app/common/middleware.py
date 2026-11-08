@@ -11,7 +11,8 @@ from app.db.models import UserDB
 from app.services.vehicle_service import VehicleService
 from app.services.replacement_service import ReplacementService
 from app.services.other_expense_service import OtherExpenseService
-from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO
+from app.services.repair_service import RepairService
+from app.services.dto import VehicleDTO, ReplacementDTO, OtherExpenseDTO, RepairDTO
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ _MSG_VEHICLE_NOT_FOUND = 'Автомобиль не найден'
 _MSG_VEHICLE_ARCHIVED = 'Автомобиль находится в архиве'
 _MSG_REPLACEMENT_NOT_FOUND = 'Замена не найдена'
 _MSG_OTHER_EXPENSE_NOT_FOUND = 'Трата не найдена'
+_MSG_REPAIR_NOT_FOUND = 'Ремонт не найден'
 _MSG_ACCESS_DENIED = 'Доступ запрещён'
 
 
@@ -177,3 +179,52 @@ def verify_other_expense_view_access(
 ) -> OtherExpenseDTO:
     """Проверка доступа к прочей трате; просмотр трат архивного авто разрешён."""
     return _verify_other_expense_access(db, current_user, expense_id, require_active=False)
+
+
+def _verify_repair_access(
+    db: Session,
+    current_user: UserDB,
+    repair_id: int,
+    require_active: bool,
+) -> RepairDTO:
+    repair_service = RepairService(db)
+    vehicle_service = VehicleService(db)
+
+    repair = repair_service.get_by_id(repair_id)
+    if not repair:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_MSG_REPAIR_NOT_FOUND,
+        )
+
+    vehicle = vehicle_service.get_by_id(repair.vehicle_id)
+    if not vehicle or vehicle.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_MSG_ACCESS_DENIED,
+        )
+    if require_active and not vehicle.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_MSG_VEHICLE_ARCHIVED,
+        )
+
+    return repair
+
+
+def verify_repair_access(
+    repair_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> RepairDTO:
+    """Проверка доступа к ремонту; операции с архивным авто запрещены."""
+    return _verify_repair_access(db, current_user, repair_id, require_active=True)
+
+
+def verify_repair_view_access(
+    repair_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> RepairDTO:
+    """Проверка доступа к ремонту; просмотр ремонтов архивного авто разрешён."""
+    return _verify_repair_access(db, current_user, repair_id, require_active=False)
