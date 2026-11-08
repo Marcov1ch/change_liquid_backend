@@ -9,14 +9,11 @@ from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.auth.handler import (
-    forgot_password,
-    register,
-    resend_cooldowns,
-    resend_verification,
-    update_email,
-    verify_email,
-)
+from app.auth.rate_limit import resend_cooldowns
+from app.auth.routes.account import update_email
+from app.auth.routes.email import resend_verification, verify_email
+from app.auth.routes.password import forgot_password
+from app.auth.routes.registration import register
 from app.auth.jwt import (
     ALGORITHM,
     SECRET_KEY,

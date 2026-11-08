@@ -53,7 +53,7 @@
 ### Точки входа
 - `src/app/main.py` — точка входа FastAPI. При старте: загружает `.env`, настраивает логирование, запускает миграции, инициализирует БД (сидирование), монтирует роутеры, стартует планировщик уведомлений.
 - `src/app/api/routes.py` — регистрация v1-роутов (`/api/v1/*`).
-- `app.auth.handler.router` монтируется напрямую в `main.py`. Auth-логика также реализована в `src/app/auth/` (JWT, обработчики, схемы).
+- `app.auth.router.router` монтируется напрямую в `main.py`. Auth-логика разделена в `src/app/auth/` (`routes/`, `rate_limit.py`, `user_service.py`, `email_tokens.py`, JWT и схемы).
 
 ### База данных
 - SQLAlchemy 2 + SQLite. Путь к БД берётся из `DB_PATH` (по умолчанию `data/app.db`). `engine` использует `connect_args={"check_same_thread": False}`.
