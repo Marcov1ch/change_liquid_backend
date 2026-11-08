@@ -1,28 +1,28 @@
-import re
 from datetime import date
 
 from pydantic import BaseModel, Field, field_validator
 
+MAX_PLATE_LENGTH = 15
+
 
 def normalize_plate_number(value: str) -> str:
-    """Проверка формата госномера (РФ или РБ) и его нормализация."""
-    allowed_letters = 'АВЕІКМНОРСТУХ'
+    """Нормализация госномера свободного формата."""
+    normalized = value.strip()
 
-    patterns = [
-        rf'^[{allowed_letters}]\d{{3}}[{allowed_letters}]{{2}}\d{{2,3}}$',
-        rf'^\d{{4}}[{allowed_letters}]{{2}}\d$',
-        rf'^\d{{4}}[{allowed_letters}]{{2}}$',
-    ]
+    if not normalized:
+        raise ValueError('Введите госномер')
 
-    cleaned = value.replace(' ', '').replace('-', '').upper()
+    if any(ord(ch) < 32 for ch in normalized):
+        raise ValueError('Госномер не может содержать управляющие символы')
 
-    if not any(re.match(p, cleaned) for p in patterns):
+    normalized = normalized.upper()
+
+    if len(normalized) > MAX_PLATE_LENGTH:
         raise ValueError(
-            'Некорректный формат госномера. '
-            'Допустимые форматы: А123АА178 (РФ) или 1234АВ7 (РБ)'
+            f'Госномер не может быть длиннее {MAX_PLATE_LENGTH} символов'
         )
 
-    return cleaned
+    return normalized
 
 
 class VehicleBase(BaseModel):
