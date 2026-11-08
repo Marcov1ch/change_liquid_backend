@@ -15,6 +15,11 @@ class UserCreate(BaseModel):
             raise ValueError('Имя пользователя не может содержать управляющие символы')
         return v
 
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
 
 class UserResponse(BaseModel):
     """Схема ответа с данными пользователя."""
@@ -50,6 +55,11 @@ class RefreshRequest(BaseModel):
 class UpdateEmailRequest(BaseModel):
     email: EmailStr
 
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
@@ -63,6 +73,11 @@ class MessageResponse(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     username: str
     email: EmailStr
+
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class ResetPasswordRequest(BaseModel):

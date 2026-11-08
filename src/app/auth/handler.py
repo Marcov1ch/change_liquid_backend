@@ -5,6 +5,7 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 import jwt
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
@@ -63,6 +64,24 @@ def _client_ip(request: Request) -> str:
     if request.client:
         return request.client.host
     return "unknown"
+
+
+def _normalize_identifier(identifier: str) -> str:
+    """Нормализовать идентификатор для rate limit и поиска по email."""
+    return identifier.strip().lower()
+
+
+def _find_user_by_identifier(db: Session, identifier: str) -> UserDB | None:
+    """Найти пользователя по username (точно) или email (без учёта регистра)."""
+    user = db.query(UserDB).filter(UserDB.username == identifier).first()
+    if user:
+        return user
+
+    email = _normalize_identifier(identifier)
+    if not email:
+        return None
+
+    return db.query(UserDB).filter(func.lower(UserDB.email) == email).first()
 
 
 def _prune_stale() -> None:
@@ -162,8 +181,15 @@ async def register(
     db: Session = Depends(get_db),
 ) -> UserResponse:
     """Регистрация нового пользователя."""
+    username = user_data.username
+    email = str(user_data.email).strip().lower()
+    normalized_username = username.strip().lower()
+
     existing = db.query(UserDB).filter(
-        (UserDB.username == user_data.username) | (UserDB.email == user_data.email)
+        (UserDB.username == username)
+        | (func.lower(UserDB.email) == email)
+        | (func.lower(UserDB.email) == normalized_username)
+        | (func.lower(UserDB.username) == email)
     ).first()
 
     if existing:
@@ -174,8 +200,8 @@ async def register(
 
     hashed = hash_password(user_data.password)
     new_user = UserDB(
-        username=user_data.username,
-        email=user_data.email,
+        username=username,
+        email=email,
         hashed_password=hashed,
         email_verified=False,
         is_active=True,
@@ -210,9 +236,9 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ) -> Token:
-    """Логин пользователя, возвращает JWT токен."""
-    username = form_data.username
-    key = f"{_client_ip(request)}:{username}"
+    """Логин пользователя по username или email, возвращает JWT токен."""
+    identifier = form_data.username
+    key = f"{_client_ip(request)}:{_normalize_identifier(identifier)}"
 
     if not check_rate_limit(key):
         raise HTTPException(
@@ -220,7 +246,7 @@ async def login(
             detail="Слишком много попыток входа. Попробуйте позже."
         )
 
-    user = db.query(UserDB).filter(UserDB.username == username).first()
+    user = _find_user_by_identifier(db, identifier)
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         add_failed_attempt(key)
@@ -352,7 +378,8 @@ async def update_email(
     current_user: UserDB = Depends(get_current_user),
 ) -> UserResponse:
     """Сменить email текущего пользователя."""
-    if request.email == current_user.email:
+    new_email = str(request.email).strip().lower()
+    if new_email == current_user.email.strip().lower():
         return UserResponse(
             id=current_user.id,
             username=current_user.username,
@@ -363,8 +390,9 @@ async def update_email(
         )
 
     existing = db.query(UserDB).filter(
-        UserDB.email == request.email,
         UserDB.id != current_user.id,
+        (func.lower(UserDB.email) == new_email)
+        | (func.lower(UserDB.username) == new_email),
     ).first()
 
     if existing:
@@ -373,7 +401,7 @@ async def update_email(
             detail="Email уже используется"
         )
 
-    current_user.email = request.email
+    current_user.email = new_email
     current_user.email_verified = False
     db.commit()
     db.refresh(current_user)
@@ -444,7 +472,7 @@ async def forgot_password(
     """Отправить письмо для восстановления пароля."""
     user = db.query(UserDB).filter(
         UserDB.username == request.username,
-        UserDB.email == request.email,
+        func.lower(UserDB.email) == str(request.email).strip().lower(),
     ).first()
 
     if not user or not user.email_verified:
@@ -496,7 +524,9 @@ async def reset_password(
             detail="Недействительный или просроченный токен",
         )
 
-    user = db.query(UserDB).filter(UserDB.email == email).first()
+    user = db.query(UserDB).filter(
+        func.lower(UserDB.email) == str(email).strip().lower()
+    ).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
