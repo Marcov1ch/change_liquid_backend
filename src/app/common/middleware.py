@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Protocol, TypeVar
 
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -50,19 +51,16 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _verify_vehicle_access(
-    db: Session,
+def _require_vehicle_access(
+    vehicle: VehicleDTO | None,
     current_user: UserDB,
-    vehicle_id: int,
     require_active: bool,
+    missing_status: int = status.HTTP_404_NOT_FOUND,
+    missing_detail: str = _MSG_VEHICLE_NOT_FOUND,
 ) -> VehicleDTO:
-    vehicle_service = VehicleService(db)
-    vehicle = vehicle_service.get_by_id(vehicle_id)
+    """Проверить существование авто, владельца и активность."""
     if not vehicle:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_MSG_VEHICLE_NOT_FOUND,
-        )
+        raise HTTPException(status_code=missing_status, detail=missing_detail)
     if vehicle.owner_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -74,6 +72,50 @@ def _verify_vehicle_access(
             detail=_MSG_VEHICLE_ARCHIVED,
         )
     return vehicle
+
+
+class _HasVehicleId(Protocol):
+    vehicle_id: int
+
+
+_RelatedEntity = TypeVar('_RelatedEntity', bound=_HasVehicleId)
+
+
+def _require_related_entity_access(
+    entity: _RelatedEntity | None,
+    current_user: UserDB,
+    require_active: bool,
+    not_found_detail: str,
+    vehicle_service: VehicleService,
+) -> _RelatedEntity:
+    """Проверить наличие связанной сущности и доступ к её автомобилю."""
+    if not entity:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=not_found_detail,
+        )
+    _require_vehicle_access(
+        vehicle_service.get_by_id(entity.vehicle_id),
+        current_user,
+        require_active,
+        missing_status=status.HTTP_403_FORBIDDEN,
+        missing_detail=_MSG_ACCESS_DENIED,
+    )
+    return entity
+
+
+def _verify_vehicle_access(
+    db: Session,
+    current_user: UserDB,
+    vehicle_id: int,
+    require_active: bool,
+) -> VehicleDTO:
+    vehicle_service = VehicleService(db)
+    return _require_vehicle_access(
+        vehicle_service.get_by_id(vehicle_id),
+        current_user,
+        require_active,
+    )
 
 
 def verify_vehicle_access(
@@ -100,29 +142,13 @@ def _verify_replacement_access(
     replacement_id: int,
     require_active: bool,
 ) -> ReplacementDTO:
-    replacement_service = ReplacementService(db)
-    vehicle_service = VehicleService(db)
-
-    replacement = replacement_service.get_by_id(replacement_id)
-    if not replacement:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_MSG_REPLACEMENT_NOT_FOUND,
-        )
-
-    vehicle = vehicle_service.get_by_id(replacement.vehicle_id)
-    if not vehicle or vehicle.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_MSG_ACCESS_DENIED,
-        )
-    if require_active and not vehicle.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=_MSG_VEHICLE_ARCHIVED,
-        )
-
-    return replacement
+    return _require_related_entity_access(
+        ReplacementService(db).get_by_id(replacement_id),
+        current_user,
+        require_active,
+        _MSG_REPLACEMENT_NOT_FOUND,
+        VehicleService(db),
+    )
 
 
 def verify_replacement_access(
@@ -149,29 +175,13 @@ def _verify_other_expense_access(
     expense_id: int,
     require_active: bool,
 ) -> OtherExpenseDTO:
-    expense_service = OtherExpenseService(db)
-    vehicle_service = VehicleService(db)
-
-    expense = expense_service.get_by_id(expense_id)
-    if not expense:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_MSG_OTHER_EXPENSE_NOT_FOUND,
-        )
-
-    vehicle = vehicle_service.get_by_id(expense.vehicle_id)
-    if not vehicle or vehicle.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_MSG_ACCESS_DENIED,
-        )
-    if require_active and not vehicle.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=_MSG_VEHICLE_ARCHIVED,
-        )
-
-    return expense
+    return _require_related_entity_access(
+        OtherExpenseService(db).get_by_id(expense_id),
+        current_user,
+        require_active,
+        _MSG_OTHER_EXPENSE_NOT_FOUND,
+        VehicleService(db),
+    )
 
 
 def verify_other_expense_access(
@@ -198,29 +208,13 @@ def _verify_repair_access(
     repair_id: int,
     require_active: bool,
 ) -> RepairDTO:
-    repair_service = RepairService(db)
-    vehicle_service = VehicleService(db)
-
-    repair = repair_service.get_by_id(repair_id)
-    if not repair:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_MSG_REPAIR_NOT_FOUND,
-        )
-
-    vehicle = vehicle_service.get_by_id(repair.vehicle_id)
-    if not vehicle or vehicle.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_MSG_ACCESS_DENIED,
-        )
-    if require_active and not vehicle.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=_MSG_VEHICLE_ARCHIVED,
-        )
-
-    return repair
+    return _require_related_entity_access(
+        RepairService(db).get_by_id(repair_id),
+        current_user,
+        require_active,
+        _MSG_REPAIR_NOT_FOUND,
+        VehicleService(db),
+    )
 
 
 def verify_repair_access(
@@ -247,29 +241,13 @@ def _verify_fuel_record_access(
     record_id: int,
     require_active: bool,
 ) -> FuelRecordDTO:
-    fuel_service = FuelRecordService(db)
-    vehicle_service = VehicleService(db)
-
-    record = fuel_service.get_by_id(record_id)
-    if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_MSG_FUEL_RECORD_NOT_FOUND,
-        )
-
-    vehicle = vehicle_service.get_by_id(record.vehicle_id)
-    if not vehicle or vehicle.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_MSG_ACCESS_DENIED,
-        )
-    if require_active and not vehicle.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=_MSG_VEHICLE_ARCHIVED,
-        )
-
-    return record
+    return _require_related_entity_access(
+        FuelRecordService(db).get_by_id(record_id),
+        current_user,
+        require_active,
+        _MSG_FUEL_RECORD_NOT_FOUND,
+        VehicleService(db),
+    )
 
 
 def verify_fuel_record_access(
@@ -296,29 +274,13 @@ def _verify_tire_set_access(
     tire_set_id: int,
     require_active: bool,
 ) -> TireSetDTO:
-    tire_set_service = TireSetService(db)
-    vehicle_service = VehicleService(db)
-
-    tire_set = tire_set_service.get_by_id(tire_set_id)
-    if not tire_set:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=_MSG_TIRE_SET_NOT_FOUND,
-        )
-
-    vehicle = vehicle_service.get_by_id(tire_set.vehicle_id)
-    if not vehicle or vehicle.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_MSG_ACCESS_DENIED,
-        )
-    if require_active and not vehicle.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=_MSG_VEHICLE_ARCHIVED,
-        )
-
-    return tire_set
+    return _require_related_entity_access(
+        TireSetService(db).get_by_id(tire_set_id),
+        current_user,
+        require_active,
+        _MSG_TIRE_SET_NOT_FOUND,
+        VehicleService(db),
+    )
 
 
 def verify_tire_set_access(
