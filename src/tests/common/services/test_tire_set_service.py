@@ -15,7 +15,7 @@ from app.common.enums import ComponentType, TireEventType, TireSeason
 from app.db.models import Base, BrandDB, ModelDB, VehicleDB
 from app.repository.replacement_repository import ReplacementRepository
 from app.repository.vehicle_repository import VehicleRepository
-from app.services.dto import VehicleDTO
+from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.tire_set_service import TireSetService
 
@@ -344,9 +344,17 @@ class TestPurchaseRecordProtection:
         assert updated_set.purchase_date is None
 
 
+def _install_events(db_session: Session, tire_set_id: int) -> list[ReplacementDTO]:
+    return [
+        item
+        for item in ReplacementRepository(db_session).find_by_tire_set_id(tire_set_id)
+        if item.tire_event_type == TireEventType.INSTALL.value
+    ]
+
+
 class TestTireHistoryDeletion:
 
-    def test_delete_install_event_keeps_set_state(
+    def test_cannot_delete_current_install_event(
         self, db_session: Session, vehicle: VehicleDTO,
     ) -> None:
         service = TireSetService(db_session)
@@ -359,12 +367,67 @@ class TestTireHistoryDeletion:
         )
         assert install.id is not None
 
-        assert ReplacementService(db_session).delete(install.id) is True
+        with pytest.raises(ValueError, match='текущего комплекта'):
+            ReplacementService(db_session).delete(install.id)
 
         updated = service.get_by_id(tire_set.id, vehicle.current_km)
         assert updated is not None
         assert updated.is_installed is True
-        assert service.replacement_service.get_tire_km_traveled(1, vehicle.current_km) == {}
+
+    def test_can_delete_older_install_event(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+        winter = service.create(
+            1, TireSetCreateRequest(name='Зимние', season=TireSeason.WINTER), vehicle,
+        )
+        summer = service.create(
+            1, TireSetCreateRequest(name='Летние', season=TireSeason.SUMMER), vehicle,
+        )
+        assert winter.id is not None and summer.id is not None
+
+        service.install(1, winter.id, TireInstallRequest(), vehicle)
+        service.install(1, summer.id, TireInstallRequest(), vehicle)
+        service.install(1, winter.id, TireInstallRequest(), vehicle)
+
+        winter_installs = sorted(
+            _install_events(db_session, winter.id),
+            key=lambda item: item.id or 0,
+        )
+        assert len(winter_installs) == 2
+
+        assert ReplacementService(db_session).delete(winter_installs[0].id) is True
+
+        updated = service.get_by_id(winter.id, vehicle.current_km)
+        assert updated is not None
+        assert updated.is_installed is True
+        assert len(_install_events(db_session, winter.id)) == 1
+
+    def test_can_delete_install_event_of_closed_set(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+        winter = service.create(
+            1, TireSetCreateRequest(name='Зимние', season=TireSeason.WINTER), vehicle,
+        )
+        summer = service.create(
+            1, TireSetCreateRequest(name='Летние', season=TireSeason.SUMMER), vehicle,
+        )
+        assert winter.id is not None and summer.id is not None
+
+        service.install(1, winter.id, TireInstallRequest(), vehicle)
+        service.install(1, summer.id, TireInstallRequest(), vehicle)
+
+        winter_installs = _install_events(db_session, winter.id)
+        assert len(winter_installs) == 1
+        assert winter_installs[0].id is not None
+
+        assert ReplacementService(db_session).delete(winter_installs[0].id) is True
+
+        updated = service.get_by_id(winter.id, vehicle.current_km)
+        assert updated is not None
+        assert updated.is_installed is False
+        assert _install_events(db_session, winter.id) == []
 
 
 class TestTireSetInstall:
