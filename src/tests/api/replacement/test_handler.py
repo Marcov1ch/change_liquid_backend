@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from app.api.replacement.handler import ReplacementHandler
-from app.common.enums import ComponentType, StatusEnum
+from app.common.enums import ComponentType, StatusEnum, TireEventType
 from app.services.dto import ReplacementDTO, VehicleDTO
 
 
@@ -155,3 +155,22 @@ def test_archival_parking_monthly_keeps_stored_date() -> None:
     assert response.status == StatusEnum.REPLACED
     assert response.km_remaining is None
     assert response.km_traveled is None
+
+
+def test_tire_purchase_has_unknown_status_and_no_mileage() -> None:
+    vehicle = _vehicle({})
+    replacement = _replacement(ComponentType.TIRE_CHANGE)
+    replacement.tire_event_type = TireEventType.PURCHASE.value
+    replacement.tire_set_id = 7
+    replacement.component_price = 30000
+
+    response = ReplacementHandler()._to_response(replacement, vehicle, is_latest=True)
+
+    assert response.status == StatusEnum.UNKNOWN
+    assert response.km_traveled is None
+    assert response.next_change_date is None
+    assert response.days_remaining is None
+    assert response.next_replacement_km is None
+    assert response.km_remaining is None
+    assert response.tire_set_id == 7
+    assert response.tire_event_type == TireEventType.PURCHASE.value

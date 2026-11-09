@@ -23,6 +23,7 @@ from app.services.replacement_service import ReplacementService
 from app.services.other_expense_service import OtherExpenseService
 from app.services.fuel_record_service import FuelRecordService
 from app.services.repair_service import RepairService
+from app.services.tire_set_service import TireSetService
 from app.services.vehicle_service import VehicleService
 from app.services.dto import VehicleDTO, ReplacementDTO
 from app.common.utils.calculator import StatusCalculator
@@ -362,12 +363,14 @@ class VehicleHandler:
         other_expense_service = OtherExpenseService(db)
         repair_service = RepairService(db)
         fuel_record_service = FuelRecordService(db)
+        tire_set_service = TireSetService(db)
 
         try:
             replacement_service.delete_by_vehicle(vehicle.id, commit=False)
             repair_service.delete_by_vehicle(vehicle.id, commit=False)
             other_expense_service.delete_by_vehicle(vehicle.id, commit=False)
             fuel_record_service.delete_by_vehicle(vehicle.id, commit=False)
+            tire_set_service.delete_by_vehicle(vehicle.id, commit=False)
             vehicle_service.hard_delete(vehicle.id, commit=False)
             db.commit()
 

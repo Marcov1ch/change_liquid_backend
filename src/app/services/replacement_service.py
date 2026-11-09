@@ -7,10 +7,16 @@ from app.api.replacement.schema import (
     ReplacementCreateRequest,
     UpdateReplacementRequest,
 )
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES, DATE_ONLY_COMPONENT_TYPES
+from app.common.enums import (
+    ComponentType,
+    DATE_BASED_COMPONENT_TYPES,
+    DATE_ONLY_COMPONENT_TYPES,
+    TireEventType,
+)
 from app.common.utils.interval_utils import ComponentIntervalUtils, add_months
 from app.repository.repair_repository import RepairRepository
 from app.repository.replacement_repository import ReplacementRepository
+from app.repository.tire_set_repository import TireSetRepository
 from app.repository.vehicle_repository import VehicleRepository
 from app.services.dto import ReplacementDTO, VehicleDTO
 
@@ -25,6 +31,7 @@ _MSG_DUPLICATE_REPLACEMENT = 'Замена с текущим пробегом у
 _MSG_INSURANCE_DATE_REQUIRED = 'Необходимо указать дату окончания'
 _MSG_DATE_END_BEFORE_START = 'Дата окончания не может быть раньше даты начала'
 _MSG_REPAIR_COST_CONFLICT = 'Нельзя указать стоимость: компонент входит в ремонт от {date}'
+_MSG_TIRE_PURCHASE_IMMUTABLE = 'Покупка комплекта шин изменяется через настройки комплекта'
 
 REPAIR_PLACEHOLDER_NAME = 'ВНЕСИТЕ ИЗМЕНЕНИЕ'
 
@@ -45,6 +52,7 @@ class ReplacementService:
     """Класс для работы с заменами."""
 
     def __init__(self, db: Session):
+        self.db = db
         self.repository = ReplacementRepository(db)
         self.vehicle_repository = VehicleRepository(db)
         self.repair_repository = RepairRepository(db)
@@ -80,6 +88,8 @@ class ReplacementService:
         request: ReplacementCreateRequest,
         vehicle_dto: VehicleDTO | None = None,
         commit: bool = True,
+        tire_set_id: int | None = None,
+        tire_event_type: str | None = None,
     ) -> ReplacementDTO:
         """Создать запись о замене компонента."""
         if vehicle_dto is None:
@@ -149,6 +159,8 @@ class ReplacementService:
             interval_km=interval_km,
             interval_months=interval_months,
             next_change_date=next_change_date,
+            tire_set_id=tire_set_id,
+            tire_event_type=tire_event_type,
         )
 
         return self.repository.save(replacement, commit=commit)
@@ -179,9 +191,13 @@ class ReplacementService:
         current_km: int,
     ) -> dict[int, int]:
         """Рассчитать пройденный пробег для каждой записи о замене шин."""
-        tires = self.repository.find_by_vehicle_and_component(
-            vehicle_id, ComponentType.TIRE_CHANGE,
-        )
+        tires = [
+            tire
+            for tire in self.repository.find_by_vehicle_and_component(
+                vehicle_id, ComponentType.TIRE_CHANGE,
+            )
+            if tire.tire_event_type != TireEventType.PURCHASE.value
+        ]
         ordered = sorted(
             tires,
             key=lambda r: (r.km_at_replacement, r.replacement_date, r.id or 0),
@@ -236,6 +252,8 @@ class ReplacementService:
         replacement = self.repository.find_by_id(replacement_id)
         if not replacement:
             return None
+        if replacement.tire_event_type == TireEventType.PURCHASE.value:
+            raise ValueError(_MSG_TIRE_PURCHASE_IMMUTABLE)
 
         vehicle_dto = self.vehicle_repository.find_active_by_id(replacement.vehicle_id)
         update = self._resolve_update(replacement, request, vehicle_dto)
@@ -412,9 +430,32 @@ class ReplacementService:
             )
         return updated
 
-    def delete(self, replacement_id: int) -> bool:
+    def delete(self, replacement_id: int, commit: bool = True) -> bool:
         """Удалить запись о замене."""
-        return bool(self.repository.delete(replacement_id))
+        replacement = self.repository.find_by_id(replacement_id)
+        if (
+            replacement
+            and replacement.tire_event_type == TireEventType.PURCHASE.value
+            and replacement.tire_set_id is not None
+        ):
+            self._clear_tire_set_purchase(replacement.tire_set_id, commit=False)
+
+        deleted = self.repository.delete(replacement_id, commit=False)
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+        return bool(deleted)
+
+    def _clear_tire_set_purchase(self, tire_set_id: int, commit: bool = False) -> None:
+        """Очистить данные покупки комплекта при удалении её записи из истории."""
+        tire_set_repository = TireSetRepository(self.db)
+        tire_set = tire_set_repository.find_by_id(tire_set_id)
+        if not tire_set:
+            return
+        tire_set.purchase_price = None
+        tire_set.purchase_date = None
+        tire_set_repository.save(tire_set, commit=commit)
 
     def delete_by_vehicle(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все замены для автомобиля."""

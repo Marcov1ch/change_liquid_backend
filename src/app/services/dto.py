@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 from app.common.enums import ComponentType
 
@@ -50,6 +50,28 @@ class ReplacementDTO:
     next_change_date: date | None = None
     interval_months: int | None = None
     source_repair_id: int | None = None
+    tire_set_id: int | None = None
+    tire_event_type: str | None = None
+
+
+@dataclass
+class TireSetDTO:
+    """DTO для передачи данных о комплекте шин."""
+    id: int | None
+    vehicle_id: int
+    name: str
+    season: str
+    purchase_date: date | None = None
+    purchase_price: int | None = None
+    accumulated_km: int = 0
+    installed_km: int | None = None
+    installed_date: date | None = None
+    is_installed: bool = False
+    next_change_date: date | None = None
+    status: str | None = None
+    days_remaining: int | None = None
+    created_at: datetime | None = None
+    total_km: int = 0
 
 
 @dataclass

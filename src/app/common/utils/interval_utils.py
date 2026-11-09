@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.common.enums import ComponentType, DATE_ONLY_COMPONENT_TYPES
+from app.common.enums import ComponentType, DATE_ONLY_COMPONENT_TYPES, TireEventType
 from app.common.component_config import COMPONENTS_CONFIG
 from app.services.dto import ReplacementDTO, VehicleDTO
 
@@ -45,6 +45,11 @@ def get_last_per_type(
     """
     last_by_type: dict[ComponentType, ReplacementDTO] = {}
     for replacement in replacements:
+        if (
+            replacement.component_type == ComponentType.TIRE_CHANGE
+            and replacement.tire_event_type == TireEventType.PURCHASE.value
+        ):
+            continue
         prev = last_by_type.get(replacement.component_type)
         if prev is None:
             last_by_type[replacement.component_type] = replacement

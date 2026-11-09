@@ -75,6 +75,14 @@ class ReplacementResponse(ReplacementBase):
         None,
         description='ID ремонта, из которого создана служебная замена',
     )
+    tire_set_id: int | None = Field(
+        None,
+        description='ID комплекта шин, к которому относится запись',
+    )
+    tire_event_type: str | None = Field(
+        None,
+        description='Тип события по шинам: purchase или install',
+    )
 
 
 class UpdateReplacementRequest(BaseModel):
