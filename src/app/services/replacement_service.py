@@ -32,6 +32,10 @@ _MSG_INSURANCE_DATE_REQUIRED = 'Необходимо указать дату о�
 _MSG_DATE_END_BEFORE_START = 'Дата окончания не может быть раньше даты начала'
 _MSG_REPAIR_COST_CONFLICT = 'Нельзя указать стоимость: компонент входит в ремонт от {date}'
 _MSG_TIRE_PURCHASE_IMMUTABLE = 'Покупка комплекта шин изменяется через настройки комплекта'
+_MSG_TIRE_CURRENT_INSTALL_DELETE = (
+    'Нельзя удалить запись установки текущего комплекта. '
+    'Сначала переключитесь на другой комплект.'
+)
 
 REPAIR_PLACEHOLDER_NAME = 'ВНЕСИТЕ ИЗМЕНЕНИЕ'
 
@@ -433,6 +437,8 @@ class ReplacementService:
     def delete(self, replacement_id: int, commit: bool = True) -> bool:
         """Удалить запись о замене."""
         replacement = self.repository.find_by_id(replacement_id)
+        if replacement and self._is_current_tire_install(replacement):
+            raise ValueError(_MSG_TIRE_CURRENT_INSTALL_DELETE)
         if (
             replacement
             and replacement.tire_event_type == TireEventType.PURCHASE.value
@@ -446,6 +452,18 @@ class ReplacementService:
         else:
             self.db.flush()
         return bool(deleted)
+
+    def _is_current_tire_install(self, replacement: ReplacementDTO) -> bool:
+        """Проверить, является ли запись текущей установкой комплекта."""
+        if replacement.tire_event_type != TireEventType.INSTALL.value:
+            return False
+        if replacement.tire_set_id is None:
+            return False
+        tire_set = TireSetRepository(self.db).find_by_id(replacement.tire_set_id)
+        if tire_set is None or not tire_set.is_installed:
+            return False
+        last_install = self.repository.get_last_install_for_tire_set(replacement.tire_set_id)
+        return last_install is not None and last_install.id == replacement.id
 
     def _clear_tire_set_purchase(self, tire_set_id: int, commit: bool = False) -> None:
         """Очистить данные покупки комплекта при удалении её записи из истории."""
