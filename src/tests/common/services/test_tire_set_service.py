@@ -161,6 +161,34 @@ class TestTireSetCreate:
         assert install.work_price == 1500
         assert install.component_price is None
 
+    def test_create_with_install_now_uses_purchase_date_as_install_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+
+        tire_set = service.create(
+            1,
+            TireSetCreateRequest(
+                name='Зимние',
+                season=TireSeason.WINTER,
+                purchase_date=PAST_DATE,
+                purchase_price=30000,
+                install_now=True,
+                work_price=1500,
+            ),
+            vehicle,
+        )
+
+        assert tire_set.id is not None
+        assert tire_set.installed_date == PAST_DATE
+
+        install = ReplacementRepository(db_session).get_last_install_for_tire_set(
+            tire_set.id,
+        )
+        assert install is not None
+        assert install.replacement_date == PAST_DATE
+        assert install.work_price == 1500
+
     def test_create_with_install_now_stores_next_change_date(
         self, db_session: Session, vehicle: VehicleDTO,
     ) -> None:
