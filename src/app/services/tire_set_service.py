@@ -98,6 +98,7 @@ class TireSetService:
                 vehicle_id,
                 saved.id,
                 TireInstallRequest(
+                    switch_date=purchase_date,
                     work_price=request.work_price,
                     next_change_date=request.next_change_date,
                 ),
