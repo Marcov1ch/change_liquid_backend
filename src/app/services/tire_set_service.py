@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -28,6 +29,27 @@ _MSG_NEXT_DATE_ONLY_INSTALLED = 'Дату следующей смены можн
 _MSG_INSTALL_EVENT_NOT_FOUND = 'Запись установки комплекта не найдена'
 _MSG_NEXT_DATE_BEFORE_INSTALL = 'Дата следующей смены не может быть раньше даты установки'
 _MSG_NEGATIVE_PURCHASE_PRICE = 'Стоимость покупки не может быть отрицательной'
+
+
+@dataclass
+class _TireSetUpdate:
+    """Итоговые значения обновления комплекта шин."""
+    tire_set: TireSetDTO
+    vehicle_dto: VehicleDTO
+    next_change_date: date | None
+    next_change_date_provided: bool
+
+
+@dataclass
+class _TireInstall:
+    """Данные для установки комплекта шин."""
+    vehicle_id: int
+    vehicle_dto: VehicleDTO
+    tire_set_id: int
+    target: TireSetDTO
+    switch_date: date
+    next_change_date: date | None
+    work_price: int | None
 
 
 class TireSetService:
@@ -127,6 +149,36 @@ class TireSetService:
                 _MSG_VEHICLE_NOT_FOUND.format(vehicle_id=tire_set.vehicle_id)
             )
 
+        update = self._resolve_update(tire_set, request, vehicle_dto)
+        return self._apply_update(update, commit)
+
+    def _resolve_update(
+        self,
+        tire_set: TireSetDTO,
+        request: TireSetUpdateRequest,
+        vehicle_dto: VehicleDTO,
+    ) -> _TireSetUpdate:
+        """Собрать итоговые значения обновлённого комплекта."""
+        self._apply_request_fields(tire_set, request)
+        tire_set.purchase_date = self._resolve_purchase_date(
+            tire_set.purchase_date,
+            tire_set.purchase_price,
+        )
+        self._validate_purchase(tire_set.purchase_date, tire_set.purchase_price)
+
+        return _TireSetUpdate(
+            tire_set=tire_set,
+            vehicle_dto=vehicle_dto,
+            next_change_date=request.next_change_date,
+            next_change_date_provided='next_change_date' in request.model_fields_set,
+        )
+
+    @staticmethod
+    def _apply_request_fields(
+        tire_set: TireSetDTO,
+        request: TireSetUpdateRequest,
+    ) -> None:
+        """Применить переданные поля запроса к комплекту."""
         if request.name is not None:
             tire_set.name = request.name
         if request.season is not None:
@@ -136,24 +188,28 @@ class TireSetService:
         if request.purchase_price is not None:
             tire_set.purchase_price = request.purchase_price
 
-        tire_set.purchase_date = self._resolve_purchase_date(
-            tire_set.purchase_date,
-            tire_set.purchase_price,
+    def _apply_update(
+        self,
+        update: _TireSetUpdate,
+        commit: bool,
+    ) -> TireSetDTO:
+        """Сохранить комплект, покупку и дату следующей смены."""
+        saved = self.repository.save(
+            update.tire_set,
+            update.vehicle_dto.current_km,
+            commit=False,
         )
-        self._validate_purchase(tire_set.purchase_date, tire_set.purchase_price)
+        self._sync_purchase_record(saved, update.vehicle_dto, commit=False)
 
-        saved = self.repository.save(tire_set, vehicle_dto.current_km, commit=False)
-        self._sync_purchase_record(saved, vehicle_dto, commit=False)
-
-        if 'next_change_date' in request.model_fields_set:
+        if update.next_change_date_provided:
             self._update_next_change_date(
                 saved,
-                request.next_change_date,
+                update.next_change_date,
                 commit=False,
             )
 
         self._finalize(commit)
-        return self._load(saved.id or 0, vehicle_dto.current_km) or saved
+        return self._load(saved.id or 0, update.vehicle_dto.current_km) or saved
 
     def delete(self, tire_set_id: int, commit: bool = True) -> bool:
         """Удалить комплект, сохранив его историю покупки и установок."""
@@ -182,6 +238,17 @@ class TireSetService:
         if not vehicle_dto:
             raise ValueError(_MSG_VEHICLE_NOT_FOUND.format(vehicle_id=vehicle_id))
 
+        install = self._resolve_install(vehicle_id, tire_set_id, request, vehicle_dto)
+        return self._apply_install(install, commit)
+
+    def _resolve_install(
+        self,
+        vehicle_id: int,
+        tire_set_id: int,
+        request: TireInstallRequest,
+        vehicle_dto: VehicleDTO,
+    ) -> _TireInstall:
+        """Проверить комплект и даты для установки."""
         target = self.repository.find_by_id(tire_set_id, vehicle_dto.current_km)
         if not target or target.vehicle_id != vehicle_id:
             raise ValueError(_MSG_SET_NOT_FOUND.format(set_id=tire_set_id))
@@ -195,37 +262,79 @@ class TireSetService:
         if next_change_date is not None and next_change_date < switch_date:
             raise ValueError(_MSG_NEXT_DATE_BEFORE_SWITCH)
 
-        self._close_installed_set(vehicle_id, vehicle_dto, commit=False)
+        return _TireInstall(
+            vehicle_id=vehicle_id,
+            vehicle_dto=vehicle_dto,
+            tire_set_id=tire_set_id,
+            target=target,
+            switch_date=switch_date,
+            next_change_date=next_change_date,
+            work_price=request.work_price,
+        )
 
+    def _apply_install(
+        self,
+        install: _TireInstall,
+        commit: bool,
+    ) -> tuple[TireSetDTO, ReplacementDTO]:
+        """Закрыть текущий комплект и установить новый."""
+        self._close_installed_set(
+            install.vehicle_id,
+            install.vehicle_dto,
+            commit=False,
+        )
+        saved_target = self._activate_target(
+            install.target,
+            install.vehicle_dto,
+            install.switch_date,
+        )
+        replacement = self._create_install_replacement(install, saved_target)
+
+        self._finalize(commit)
+        updated = self._load(
+            install.tire_set_id,
+            install.vehicle_dto.current_km,
+        ) or saved_target
+        return updated, replacement
+
+    def _activate_target(
+        self,
+        target: TireSetDTO,
+        vehicle_dto: VehicleDTO,
+        switch_date: date,
+    ) -> TireSetDTO:
+        """Отметить комплект установленным на текущем пробеге."""
         target.installed_km = vehicle_dto.current_km
         target.installed_date = switch_date
         target.is_installed = True
-        saved_target = self.repository.save(
+        return self.repository.save(
             target,
             vehicle_dto.current_km,
             commit=False,
         )
 
-        replacement = self.replacement_service.create(
-            vehicle_id,
+    def _create_install_replacement(
+        self,
+        install: _TireInstall,
+        saved_target: TireSetDTO,
+    ) -> ReplacementDTO:
+        """Создать запись установки комплекта в истории замен."""
+        return self.replacement_service.create(
+            install.vehicle_id,
             ReplacementCreateRequest(
                 component_type=ComponentType.TIRE_CHANGE,
                 component_name=saved_target.name,
                 component_price=None,
-                work_price=request.work_price,
-                replacement_date=switch_date,
-                km_at_replacement=vehicle_dto.current_km,
-                next_change_date=next_change_date,
+                work_price=install.work_price,
+                replacement_date=install.switch_date,
+                km_at_replacement=install.vehicle_dto.current_km,
+                next_change_date=install.next_change_date,
             ),
-            vehicle_dto,
+            install.vehicle_dto,
             commit=False,
-            tire_set_id=tire_set_id,
+            tire_set_id=install.tire_set_id,
             tire_event_type=TireEventType.INSTALL.value,
         )
-
-        self._finalize(commit)
-        updated = self._load(tire_set_id, vehicle_dto.current_km) or saved_target
-        return updated, replacement
 
     def delete_by_vehicle(self, vehicle_id: int, commit: bool = True) -> int:
         """Удалить все комплекты шин автомобиля."""

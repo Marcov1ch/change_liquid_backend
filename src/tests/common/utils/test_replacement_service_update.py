@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.repair.schema import RepairCreateRequest
-from app.api.replacement.schema import UpdateReplacementRequest
+from app.api.replacement.schema import ReplacementCreateRequest, UpdateReplacementRequest
 from app.common.enums import ComponentType
 from app.db.models import Base, BrandDB, ModelDB, ReplacementDB, VehicleDB
 from app.repository.replacement_repository import ReplacementRepository
@@ -336,6 +336,79 @@ def test_update_priced_replacement_conflicts_with_repair(
 
     with pytest.raises(ValueError, match='входит в ремонт'):
         _update(service, placeholder.id, component_price=1000)  # type: ignore[arg-type]
+
+
+class TestReplacementSequence:
+
+    def test_create_rejects_km_less_than_previous(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        _add_replacement(
+            db_session,
+            replacement_date=date(2026, 1, 15),
+            km=12000,
+        )
+        service = _service(db_session)
+
+        with pytest.raises(ValueError, match='не может быть меньше предыдущей'):
+            service.create(
+                vehicle.id,  # type: ignore[arg-type]
+                ReplacementCreateRequest(
+                    component_type=ComponentType.ENGINE_OIL,
+                    component_name='Новая замена',
+                    component_price=0,
+                    work_price=0,
+                    replacement_date=date(2026, 1, 20),
+                    km_at_replacement=11000,
+                ),
+                vehicle,
+            )
+
+    def test_create_rejects_date_earlier_than_previous(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        _add_replacement(
+            db_session,
+            replacement_date=date(2026, 1, 15),
+            km=12000,
+        )
+        service = _service(db_session)
+
+        with pytest.raises(ValueError, match='не может быть раньше предыдущей'):
+            service.create(
+                vehicle.id,  # type: ignore[arg-type]
+                ReplacementCreateRequest(
+                    component_type=ComponentType.ENGINE_OIL,
+                    component_name='Новая замена',
+                    component_price=0,
+                    work_price=0,
+                    replacement_date=date(2026, 1, 10),
+                    km_at_replacement=13000,
+                ),
+                vehicle,
+            )
+
+    def test_update_rejects_date_earlier_than_previous(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        _add_replacement(
+            db_session,
+            replacement_date=date(2026, 1, 10),
+            km=11000,
+        )
+        replacement = _add_replacement(
+            db_session,
+            replacement_date=date(2026, 1, 20),
+            km=12000,
+        )
+        service = _service(db_session)
+
+        with pytest.raises(ValueError, match='не может быть раньше предыдущей'):
+            _update(
+                service,
+                replacement.id,  # type: ignore[arg-type]
+                replacement_date=date(2026, 1, 5),
+            )
 
 
 def _repair_request() -> RepairCreateRequest:
