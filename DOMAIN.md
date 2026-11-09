@@ -141,7 +141,8 @@ km_remaining        = next_replacement_km - current_km
 
 Статистика по месяцам и годам рассчитывается на frontend из уже загруженных записей автомобиля: замен, ремонтов, заправок и прочих трат. Отдельного backend-эндпоинта и хранения нет.
 
-- Замены: `component_price + work_price`.
+- Замены: `component_price + work_price` для всех компонентов, кроме `tire_change`.
+- Шины: `component_price + work_price` для записей `tire_change` (покупка комплекта и работы по установке).
 - Ремонты: `work_cost + parts_cost`.
 - Заправки: `total_cost`.
 - Прочие траты: `amount`.
