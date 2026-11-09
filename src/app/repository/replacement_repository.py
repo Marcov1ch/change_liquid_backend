@@ -5,7 +5,12 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.db.models import ReplacementDB
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_KEYS, DATE_ONLY_COMPONENT_KEYS
+from app.common.enums import (
+    ComponentType,
+    DATE_BASED_COMPONENT_KEYS,
+    DATE_ONLY_COMPONENT_KEYS,
+    TireEventType,
+)
 from app.services.dto import ReplacementDTO
 
 
@@ -14,6 +19,14 @@ class ReplacementRepository:
 
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def _is_tire_purchase(row: ReplacementDB) -> bool:
+        """Является ли запись покупкой комплекта шин."""
+        return bool(
+            row.component_type == ComponentType.TIRE_CHANGE.value
+            and row.tire_event_type == TireEventType.PURCHASE.value
+        )
 
     @staticmethod
     def _is_newer_row(candidate: ReplacementDB, current: ReplacementDB) -> bool:
@@ -42,6 +55,8 @@ class ReplacementRepository:
             next_change_date=db_row.next_change_date,
             interval_months=db_row.interval_months,
             source_repair_id=db_row.source_repair_id,
+            tire_set_id=db_row.tire_set_id,
+            tire_event_type=db_row.tire_event_type,
         )
 
     @staticmethod
@@ -121,6 +136,8 @@ class ReplacementRepository:
 
         best_by_type: dict[str, ReplacementDB] = {}
         for replacement in rows:
+            if self._is_tire_purchase(replacement):
+                continue
             key = replacement.component_type
             current = best_by_type.get(key)
             if current is None or self._is_newer_row(replacement, current):
@@ -166,6 +183,58 @@ class ReplacementRepository:
         ).all()
         return [self._to_dto(replacement) for replacement in db_replacements]
 
+    def find_by_tire_set_id(self, tire_set_id: int) -> List[ReplacementDTO]:
+        """Найти все записи, связанные с комплектом шин."""
+        db_replacements = self.db.query(ReplacementDB).filter(
+            ReplacementDB.tire_set_id == tire_set_id
+        ).all()
+        return [self._to_dto(replacement) for replacement in db_replacements]
+
+    def get_last_install_for_tire_set(
+        self,
+        tire_set_id: int,
+    ) -> Optional[ReplacementDTO]:
+        """Найти последнюю установку комплекта шин."""
+        rows = self.db.query(ReplacementDB).filter(
+            ReplacementDB.tire_set_id == tire_set_id,
+            ReplacementDB.tire_event_type == TireEventType.INSTALL.value,
+        ).all()
+        if not rows:
+            return None
+
+        best = rows[0]
+        for row in rows[1:]:
+            if self._is_newer_row(row, best):
+                best = row
+        return self._to_dto(best)
+
+    def find_tire_event(
+        self,
+        vehicle_id: int,
+        tire_set_id: int,
+        event_type: TireEventType,
+    ) -> Optional[ReplacementDTO]:
+        """Найти событие комплекта шин указанного типа."""
+        db_replacement = self.db.query(ReplacementDB).filter(
+            ReplacementDB.vehicle_id == vehicle_id,
+            ReplacementDB.tire_set_id == tire_set_id,
+            ReplacementDB.tire_event_type == event_type.value,
+        ).first()
+        if not db_replacement:
+            return None
+        return self._to_dto(db_replacement)
+
+    def clear_tire_set_id(self, tire_set_id: int, commit: bool = True) -> int:
+        """Отвязать замены от удалённого комплекта шин."""
+        count = self.db.query(ReplacementDB).filter(
+            ReplacementDB.tire_set_id == tire_set_id,
+        ).update({ReplacementDB.tire_set_id: None})
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
+        return count  # type: ignore[no-any-return]
+
     def find_by_vehicle_component_and_km(
         self,
         vehicle_id: int,
@@ -195,6 +264,7 @@ class ReplacementRepository:
             ReplacementDB.component_type == component_type.value
         ).all()
 
+        rows = [row for row in rows if not self._is_tire_purchase(row)]
         if not rows:
             return None
 
@@ -266,6 +336,7 @@ class ReplacementRepository:
             ReplacementDB.component_type == component_type.value
         ).all()
 
+        rows = [row for row in rows if not self._is_tire_purchase(row)]
         if not rows:
             return None
 
@@ -300,6 +371,8 @@ class ReplacementRepository:
 
         best_by_type: dict[str, ReplacementDB] = {}
         for replacement in rows:
+            if self._is_tire_purchase(replacement):
+                continue
             key = replacement.component_type
             current = best_by_type.get(key)
             if current is None or self._is_newer_row(replacement, current):
@@ -342,6 +415,7 @@ class ReplacementRepository:
         replacement_id: int,
         date_warning_notified: bool | None = None,
         date_overdue_notified: bool | None = None,
+        commit: bool = True,
     ) -> None:
         """Обновить флаги date-based уведомлений."""
         db_replacement = self.db.query(ReplacementDB).filter(
@@ -352,7 +426,10 @@ class ReplacementRepository:
                 db_replacement.date_warning_notified = date_warning_notified
             if date_overdue_notified is not None:
                 db_replacement.date_overdue_notified = date_overdue_notified
-            self.db.commit()
+            if commit:
+                self.db.commit()
+            else:
+                self.db.flush()
 
     def reset_date_notify_flags(self, vehicle_id: int, commit: bool = True) -> int:
         """Сбросить флаги date-уведомлений у non-date-based замен автомобиля."""

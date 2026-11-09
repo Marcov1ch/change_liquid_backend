@@ -13,12 +13,14 @@ from app.services.replacement_service import ReplacementService
 from app.services.other_expense_service import OtherExpenseService
 from app.services.repair_service import RepairService
 from app.services.fuel_record_service import FuelRecordService
+from app.services.tire_set_service import TireSetService
 from app.services.dto import (
     VehicleDTO,
     ReplacementDTO,
     OtherExpenseDTO,
     RepairDTO,
     FuelRecordDTO,
+    TireSetDTO,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ _MSG_REPLACEMENT_NOT_FOUND = 'Замена не найдена'
 _MSG_OTHER_EXPENSE_NOT_FOUND = 'Трата не найдена'
 _MSG_REPAIR_NOT_FOUND = 'Ремонт не найден'
 _MSG_FUEL_RECORD_NOT_FOUND = 'Заправка не найдена'
+_MSG_TIRE_SET_NOT_FOUND = 'Комплект шин не найден'
 _MSG_ACCESS_DENIED = 'Доступ запрещён'
 
 
@@ -285,3 +288,52 @@ def verify_fuel_record_view_access(
 ) -> FuelRecordDTO:
     """Проверка доступа к заправке; просмотр заправок архивного авто разрешён."""
     return _verify_fuel_record_access(db, current_user, record_id, require_active=False)
+
+
+def _verify_tire_set_access(
+    db: Session,
+    current_user: UserDB,
+    tire_set_id: int,
+    require_active: bool,
+) -> TireSetDTO:
+    tire_set_service = TireSetService(db)
+    vehicle_service = VehicleService(db)
+
+    tire_set = tire_set_service.get_by_id(tire_set_id)
+    if not tire_set:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_MSG_TIRE_SET_NOT_FOUND,
+        )
+
+    vehicle = vehicle_service.get_by_id(tire_set.vehicle_id)
+    if not vehicle or vehicle.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=_MSG_ACCESS_DENIED,
+        )
+    if require_active and not vehicle.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_MSG_VEHICLE_ARCHIVED,
+        )
+
+    return tire_set
+
+
+def verify_tire_set_access(
+    tire_set_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> TireSetDTO:
+    """Проверка доступа к комплекту шин; операции с архивным авто запрещены."""
+    return _verify_tire_set_access(db, current_user, tire_set_id, require_active=True)
+
+
+def verify_tire_set_view_access(
+    tire_set_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> TireSetDTO:
+    """Проверка доступа к комплекту шин; просмотр архивного авто разрешён."""
+    return _verify_tire_set_access(db, current_user, tire_set_id, require_active=False)

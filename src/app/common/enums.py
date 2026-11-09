@@ -24,6 +24,19 @@ DATE_BASED_COMPONENT_TYPES = frozenset({ComponentType.TIRE_CHANGE}) | DATE_ONLY_
 DATE_BASED_COMPONENT_KEYS = frozenset(component.value for component in DATE_BASED_COMPONENT_TYPES)
 
 
+class TireSeason(Enum):
+    """Сезон комплекта шин."""
+    SUMMER = "summer"
+    WINTER = "winter"
+    ALL_SEASON = "all_season"
+
+
+class TireEventType(Enum):
+    """Тип события по шинам в истории замен."""
+    PURCHASE = "purchase"
+    INSTALL = "install"
+
+
 class StatusEnum(Enum):
     """Статусы по заменам."""
     OVERDUE = "overdue"

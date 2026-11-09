@@ -130,6 +130,36 @@ class VehicleDB(Base):  # type: ignore
         back_populates="vehicle",
         cascade="all, delete-orphan",
     )
+    tire_sets = relationship(
+        "TireSetDB",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+    )
+
+
+class TireSetDB(Base):  # type: ignore
+    """Комплект шин автомобиля."""
+
+    __tablename__ = "tire_sets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(
+        Integer,
+        ForeignKey("vehicles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String, nullable=False)
+    season = Column(String, nullable=False, default="all_season")
+    purchase_date = Column(Date, nullable=True)
+    purchase_price = Column(Integer, nullable=True)
+    accumulated_km = Column(Integer, nullable=False, default=0, server_default="0")
+    installed_km = Column(Integer, nullable=True)
+    installed_date = Column(Date, nullable=True)
+    is_installed = Column(Boolean, nullable=False, default=False, server_default="0")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    vehicle = relationship("VehicleDB", back_populates="tire_sets")
 
 
 class VehicleSizeDB(Base):  # type: ignore
@@ -172,6 +202,13 @@ class ReplacementDB(Base):  # type: ignore
     interval_km = Column(Integer, nullable=False)
     interval_months = Column(Integer, nullable=True)
     next_change_date = Column(Date, nullable=True)
+    tire_set_id = Column(
+        Integer,
+        ForeignKey("tire_sets.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    tire_event_type = Column(String, nullable=True)
 
     warning_notified = Column(Boolean, default=False)
     critical_notified = Column(Boolean, default=False)

@@ -83,6 +83,62 @@ class PublicReplacementResponse(BaseModel):
         ...,
         description='Статус замены',
     )
+    tire_set_id: int | None = Field(
+        None,
+        description='ID комплекта шин, к которому относится запись',
+    )
+    tire_event_type: str | None = Field(
+        None,
+        description='Тип события по шинам: purchase или install',
+    )
+
+
+class PublicTireSetResponse(BaseModel):
+    """Комплект шин в публичном профиле."""
+    id: int = Field(
+        ...,
+        description='ID комплекта',
+    )
+    name: str = Field(
+        ...,
+        description='Название комплекта',
+    )
+    season: str = Field(
+        ...,
+        description='Сезон комплекта',
+    )
+    purchase_date: date | None = Field(
+        None,
+        description='Дата покупки',
+    )
+    purchase_price: int | None = Field(
+        None,
+        description='Стоимость покупки',
+    )
+    is_installed: bool = Field(
+        ...,
+        description='Установлен ли комплект сейчас',
+    )
+    installed_date: date | None = Field(
+        None,
+        description='Дата установки текущего сезона',
+    )
+    next_change_date: date | None = Field(
+        None,
+        description='Дата следующей смены шин',
+    )
+    status: str | None = Field(
+        None,
+        description='Статус установленного комплекта по дате',
+    )
+    days_remaining: int | None = Field(
+        None,
+        description='Остаток дней до следующей смены',
+    )
+    total_km: int = Field(
+        ...,
+        description='Суммарный пробег комплекта',
+    )
 
 
 class PublicOtherExpenseResponse(BaseModel):
@@ -194,6 +250,10 @@ class PublicVehicleResponse(BaseModel):
     replacements: list[PublicReplacementResponse] = Field(
         default_factory=list,
         description='История замен',
+    )
+    tire_sets: list[PublicTireSetResponse] = Field(
+        default_factory=list,
+        description='Комплекты шин',
     )
     other_expenses: list[PublicOtherExpenseResponse] = Field(
         default_factory=list,

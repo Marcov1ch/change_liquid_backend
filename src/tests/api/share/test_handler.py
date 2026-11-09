@@ -12,6 +12,7 @@ from app.services.dto import (
     OtherExpenseDTO,
     RepairDTO,
     ReplacementDTO,
+    TireSetDTO,
     VehicleDTO,
 )
 
@@ -69,6 +70,7 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
         patch('app.api.share.handler.OtherExpenseService') as other_expense_service_cls,
         patch('app.api.share.handler.RepairService') as repair_service_cls,
         patch('app.api.share.handler.FuelRecordService') as fuel_service_cls,
+        patch('app.api.share.handler.TireSetService') as tire_set_service_cls,
         patch('app.api.share.handler.build_register_url', return_value='http://front/register'),
     ):
         share_service_cls.return_value.find_by_token.return_value = _vehicle()
@@ -107,6 +109,17 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
                 consumption_l_per_100km=7.1,
             ),
         ]
+        tire_set_service_cls.return_value.get_by_vehicle.return_value = [
+            TireSetDTO(
+                id=1,
+                vehicle_id=1,
+                name='Зимние',
+                season='winter',
+                is_installed=True,
+                installed_date=date(2026, 1, 10),
+                total_km=5000,
+            ),
+        ]
 
         response = asyncio.run(
             ShareHandler().get_public_vehicle('tok', db=MagicMock())
@@ -119,6 +132,9 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
     assert len(response.replacements) == 1
     assert response.replacements[0].component_price == 5000
     assert response.replacements[0].status == StatusEnum.GOOD
+    assert len(response.tire_sets) == 1
+    assert response.tire_sets[0].name == 'Зимние'
+    assert response.tire_sets[0].total_km == 5000
     assert not hasattr(response.replacements[0], 'vehicle_id')
     assert len(response.other_expenses) == 1
     assert response.other_expenses[0].name == 'Штраф'

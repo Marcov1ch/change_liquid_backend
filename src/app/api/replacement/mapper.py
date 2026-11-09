@@ -1,6 +1,12 @@
 from app.api.replacement.schema import ReplacementResponse
 from app.common.constants import get_date_warning_days
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES, DATE_ONLY_COMPONENT_TYPES, StatusEnum
+from app.common.enums import (
+    ComponentType,
+    DATE_BASED_COMPONENT_TYPES,
+    DATE_ONLY_COMPONENT_TYPES,
+    StatusEnum,
+    TireEventType,
+)
 from app.common.utils.calculator import StatusCalculator
 from app.common.utils.interval_utils import add_months
 from app.services.dto import ReplacementDTO, VehicleDTO
@@ -16,6 +22,32 @@ def build_replacement_response(
     is_tire = replacement_dto.component_type == ComponentType.TIRE_CHANGE
     is_date_only = replacement_dto.component_type in DATE_ONLY_COMPONENT_TYPES
     is_date_based = replacement_dto.component_type in DATE_BASED_COMPONENT_TYPES
+    is_tire_purchase = (
+        is_tire
+        and replacement_dto.tire_event_type == TireEventType.PURCHASE.value
+    )
+    if is_tire_purchase:
+        return ReplacementResponse(
+            id=replacement_dto.id,
+            vehicle_id=replacement_dto.vehicle_id,
+            component_type=replacement_dto.component_type,
+            component_name=replacement_dto.component_name,
+            component_price=replacement_dto.component_price,
+            work_price=replacement_dto.work_price,
+            replacement_date=replacement_dto.replacement_date,
+            km_at_replacement=replacement_dto.km_at_replacement,
+            interval_km=replacement_dto.interval_km,
+            next_replacement_km=None,
+            km_remaining=None,
+            km_traveled=None,
+            next_change_date=None,
+            days_remaining=None,
+            status=StatusEnum.UNKNOWN.value,
+            source_repair_id=replacement_dto.source_repair_id,
+            tire_set_id=replacement_dto.tire_set_id,
+            tire_event_type=replacement_dto.tire_event_type,
+        )
+
     if is_tire and km_traveled is None:
         km_traveled = max(0, vehicle.current_km - replacement_dto.km_at_replacement)
     if not is_tire:
@@ -40,6 +72,8 @@ def build_replacement_response(
             days_remaining=None,
             status=StatusEnum.REPLACED.value,
             source_repair_id=replacement_dto.source_repair_id,
+            tire_set_id=replacement_dto.tire_set_id,
+            tire_event_type=replacement_dto.tire_event_type,
         )
 
     if is_date_based:
@@ -64,6 +98,8 @@ def build_replacement_response(
             days_remaining=status_data["days_remaining"],
             status=status_data["status"],
             source_repair_id=replacement_dto.source_repair_id,
+            tire_set_id=replacement_dto.tire_set_id,
+            tire_event_type=replacement_dto.tire_event_type,
         )
 
     interval = vehicle.intervals.get(replacement_dto.component_type.value, 0)
@@ -99,4 +135,6 @@ def build_replacement_response(
         days_remaining=days_remaining,
         status=status_data["status"],
         source_repair_id=replacement_dto.source_repair_id,
+        tire_set_id=replacement_dto.tire_set_id,
+        tire_event_type=replacement_dto.tire_event_type,
     )

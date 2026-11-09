@@ -9,6 +9,7 @@ from app.api.share.schema import (
     PublicOtherExpenseResponse,
     PublicRepairResponse,
     PublicReplacementResponse,
+    PublicTireSetResponse,
     PublicVehicleResponse,
     ShareLinkResponse,
 )
@@ -22,6 +23,7 @@ from app.services.other_expense_service import OtherExpenseService
 from app.services.repair_service import RepairService
 from app.services.replacement_service import ReplacementService
 from app.services.share_service import VehicleShareService
+from app.services.tire_set_service import TireSetService
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +162,27 @@ class ShareHandler:
                 for record in fuel_record_service.get_by_vehicle(vehicle.id)
             ]
 
+            tire_set_service = TireSetService(db)
+            public_tire_sets = [
+                PublicTireSetResponse(
+                    id=tire_set.id or 0,
+                    name=tire_set.name,
+                    season=tire_set.season,
+                    purchase_date=tire_set.purchase_date,
+                    purchase_price=tire_set.purchase_price,
+                    is_installed=tire_set.is_installed,
+                    installed_date=tire_set.installed_date,
+                    next_change_date=tire_set.next_change_date,
+                    status=tire_set.status,
+                    days_remaining=tire_set.days_remaining,
+                    total_km=tire_set.total_km,
+                )
+                for tire_set in tire_set_service.get_by_vehicle(
+                    vehicle.id or 0,
+                    vehicle.current_km,
+                )
+            ]
+
             repair_service = RepairService(db)
             public_repairs = [
                 PublicRepairResponse(
@@ -182,6 +205,7 @@ class ShareHandler:
                 current_km=vehicle.current_km,
                 vehicle_status=StatusCalculator.get_vehicle_status(vehicle, replacements),
                 replacements=public_replacements,
+                tire_sets=public_tire_sets,
                 other_expenses=public_other_expenses,
                 repairs=public_repairs,
                 fuel_records=public_fuel_records,

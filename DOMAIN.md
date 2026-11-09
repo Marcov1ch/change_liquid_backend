@@ -77,12 +77,30 @@ km_remaining        = next_replacement_km - current_km
 | `parking_monthly` | Аренда машиноместа | — | — (только по дате) |
 
 - У **всех** компонентов, кроме date-based (`tire_change`, `insurance`, `parking_monthly`), есть **оба** интервала: по пробегу и по месяцам.
-- `tire_change` — особый тип: его нет в `COMPONENTS_CONFIG`, у него нет интервалов по км/мес. Дата следующей замены (`next_change_date`) задаётся вручную при создании записи, статус считается только по дате. Пробег установки сохраняется в `km_at_replacement`; в ответе отдаётся `km_traveled` — сколько км проехали шины (до следующей записи шин или до текущего пробега авто для последней записи). Уведомлений по пробегу для шин нет.
+- `tire_change` — особый тип: его нет в `COMPONENTS_CONFIG`, у него нет интервалов по км/мес. Дата следующей замены (`next_change_date`) задаётся вручную при создании записи, статус считается только по дате. Пробег установки сохраняется в `km_at_replacement`; в ответе отдаётся `km_traveled` — сколько км проехали шины (до следующей записи шин или до текущего пробега авто для последней записи). Уведомлений по пробегу для шин нет. Запись может быть связана с комплектом шин через `tire_set_id` (см. раздел «Комплекты шин»).
 - `insurance` — особый тип, также вне `COMPONENTS_CONFIG`, только по дате. При создании `next_change_date` обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость страховки — в `component_price`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомления по пробегу для страховки нет.
 - `parking_monthly` — аренда машиноместа, вне `COMPONENTS_CONFIG`, только по дате. `replacement_date` — начало аренды, `next_change_date` — окончание и обязательна; `km_at_replacement` и `interval_km` сохраняются как `0`, `work_price` — `None`, стоимость — в `component_price`, место/номер договора — в `component_name`. В ответе `next_replacement_km`, `km_remaining` и `km_traveled` — `null`. Уведомление приходит за 1 день до окончания; в день окончания статус `warning`, `overdue` — со следующего дня.
 - Интервал по пробегу влияет на статус (`good/warning/...`), интервал по месяцам — на `next_change_date` / `days_remaining`.
 - Интервалы хранятся у автомобиля (колонки `*_interval_km` / `*_interval_months`). Если значение не задано — подставляется дефолт из `COMPONENTS_CONFIG` (см. `VehicleRepository._intervals_and_flags`).
 - Флаги уведомлений также хранятся у автомобиля (`*_notify_enabled`, плюс `tire_notify_enabled`, `insurance_notify_enabled` и `parking_monthly_notify_enabled`) и переключаются через `PATCH /api/v1/vehicles/{id}/notify`.
+
+## Комплекты шин
+
+`TireSetDB` (`tire_sets`) — физический комплект шин, который переиспользуется несколько сезонов.
+
+- `season`: `summer` / `winter` / `all_season`; `purchase_date`, `purchase_price` — разовая покупка комплекта.
+- `accumulated_km` — пробег за завершённые сезоны; `installed_km`, `installed_date`, `is_installed` — текущая установка.
+- Суммарный пробег: `accumulated_km + max(0, current_km - installed_km)`, если комплект установлен.
+- Переключение (`POST /api/v1/vehicles/{id}/tire-sets/{set_id}/install`): закрывает текущий установленный комплект (`accumulated_km += current_km - installed_km`), активирует новый и создаёт запись `ReplacementDB` с `component_type=tire_change`, `tire_event_type=install`, `tire_set_id`, нулевой стоимостью шин, опциональной стоимостью работ (`work_price`) и опциональной `next_change_date`. Стоимость работ может быть `0`/`None`, если установку делают самостоятельно.
+- Покупка комплекта с `purchase_price > 0` создаёт запись `tire_change` с `tire_event_type=purchase`, `component_price=purchase_price`, `replacement_date=purchase_date`. Она попадает в статистику в месяц покупки. При изменении цены/даты покупки запись синхронизируется, при обнулении цены — удаляется.
+- Создание комплекта с `install_now=true` сразу устанавливает его: закрывает текущий комплект и создаёт запись установки с опциональной стоимостью работ `work_price`. Это сценарий «купил и сразу поставил».
+- У установленного комплекта можно задать `next_change_date` — она сохраняется в последней записи установки; планировщик присылает уведомление за 5 дней до этой даты. Дату можно изменить через `PATCH /api/v1/tire-sets/{id}` (поле `next_change_date`), при этом флаги date-уведомлений сбрасываются.
+- В ответе комплекта для установленного комплекта отдаются `status` и `days_remaining`, рассчитанные по `next_change_date` с порогом 5 дней (`good` / `warning` / `overdue` / `unknown`). Этот же статус участвует в общем статусе автомобиля.
+- Записи `tire_event_type=purchase` исключаются из выбора последней замены, статусов, уведомлений и `km_traveled`; legacy-записи без `tire_event_type` считаются установками.
+- Старые записи `tire_change` не мигрируются и продолжают работать как линейная история.
+- Удалить установленный комплект нельзя. `DELETE /api/v1/tire-sets/{id}` удаляет комплект и отвязывает его записи истории (`tire_set_id = NULL`); сами записи покупки и установок остаются в общей истории и статистике.
+- Публичный профиль автомобиля отдаёт `tire_sets` с суммарным пробегом; стоимость покупки в блоке — только для отображения, в общих суммах она уже учтена через запись `purchase`.
+- Любую запись из истории шин (`purchase`, `install` или legacy `tire_change`) можно удалить через `DELETE /api/v1/replacements/{id}`. При удалении `purchase`-записи очищаются `purchase_price` и `purchase_date` комплекта, чтобы при следующем редактировании запись не создалась снова.
 
 ## Прочие траты
 
