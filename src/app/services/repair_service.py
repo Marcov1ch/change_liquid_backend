@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -20,6 +21,24 @@ _MSG_PRICED_REPLACEMENT = 'На {date} уже есть замена с цено�
 
 _ALLOWED_COMPONENT_TYPES = {config.type for config in COMPONENTS_CONFIG}
 _COMPONENT_NAMES = {config.type: config.name for config in COMPONENTS_CONFIG}
+
+
+@dataclass
+class _RepairUpdate:
+    """Итоговые значения ремонта после частичного обновления."""
+    repair: RepairDTO
+    vehicle_dto: VehicleDTO
+    description: str | None
+    repair_date: date
+    km_at_repair: int
+    work_cost: int
+    parts_cost: int
+    component_types: list[ComponentType]
+    old_date: date
+    old_km: int
+    old_types: set[ComponentType]
+    new_types: set[ComponentType]
+    linked: list[ReplacementDTO]
 
 
 class RepairService:
@@ -168,81 +187,134 @@ class RepairService:
         if not vehicle_dto:
             raise ValueError(_MSG_VEHICLE_NOT_FOUND)
 
+        update = self._resolve_update(repair, request, vehicle_dto)
+        self._validate_update(update)
+        return self._apply_update(update, commit)
+
+    def _resolve_update(
+        self,
+        repair: RepairDTO,
+        request: RepairCreateRequest,
+        vehicle_dto: VehicleDTO,
+    ) -> _RepairUpdate:
+        """Собрать итоговые значения ремонта из запроса."""
         self._validate_date(request.repair_date)
         self._validate_km(request.km_at_repair)
         self._validate_costs(request.work_cost, request.parts_cost)
         component_types = self._normalize_components(request.component_types)
 
-        old_date = repair.repair_date
-        old_km = repair.km_at_repair
-        old_types = set(repair.component_types)
-        new_types = set(component_types)
+        return _RepairUpdate(
+            repair=repair,
+            vehicle_dto=vehicle_dto,
+            description=self._normalize_description(request.description),
+            repair_date=request.repair_date,
+            km_at_repair=request.km_at_repair,
+            work_cost=request.work_cost,
+            parts_cost=request.parts_cost,
+            component_types=component_types,
+            old_date=repair.repair_date,
+            old_km=repair.km_at_repair,
+            old_types=set(repair.component_types),
+            new_types=set(component_types),
+            linked=self.replacement_repository.find_by_source_repair_id(repair.id or 0),
+        )
 
-        linked = self.replacement_repository.find_by_source_repair_id(repair_id)
-
+    def _validate_update(self, update: _RepairUpdate) -> None:
+        """Проверить конфликты обновлённого ремонта с платными заменами."""
         conflicts = self.repository.find_priced_component_types(
-            repair.vehicle_id,
-            request.repair_date,
-            component_types,
+            update.repair.vehicle_id,
+            update.repair_date,
+            update.component_types,
         )
         if conflicts:
-            raise self._conflict_error(sorted(conflicts)[0], request.repair_date)
+            raise self._conflict_error(sorted(conflicts)[0], update.repair_date)
 
+    def _apply_update(self, update: _RepairUpdate, commit: bool) -> RepairDTO:
+        """Записать ремонт и синхронизировать служебные замены."""
         saved = self.repository.save(
             RepairDTO(
-                id=repair.id,
-                vehicle_id=repair.vehicle_id,
-                repair_date=request.repair_date,
-                km_at_repair=request.km_at_repair,
-                description=self._normalize_description(request.description),
-                work_cost=request.work_cost,
-                parts_cost=request.parts_cost,
-                component_types=component_types,
+                id=update.repair.id,
+                vehicle_id=update.repair.vehicle_id,
+                repair_date=update.repair_date,
+                km_at_repair=update.km_at_repair,
+                description=update.description,
+                work_cost=update.work_cost,
+                parts_cost=update.parts_cost,
+                component_types=update.component_types,
             ),
             commit=False,
         )
-        self._update_vehicle_km(vehicle_dto, request.km_at_repair)
-
-        removed_types = old_types - new_types
-        moved_untouched: set[ComponentType] = set()
-
-        for replacement in linked:
-            component_type = replacement.component_type
-            untouched = self._is_untouched_placeholder(replacement, old_date, old_km)
-
-            if component_type in removed_types:
-                if untouched:
-                    self.replacement_repository.delete(
-                        replacement.id, commit=False,  # type: ignore[arg-type]
-                    )
-                else:
-                    replacement.source_repair_id = None
-                    self.replacement_repository.save(replacement, commit=False)
-                continue
-
-            if (
-                untouched
-                and (old_date != request.repair_date or old_km != request.km_at_repair)
-            ):
-                self.replacement_repository.delete(
-                    replacement.id, commit=False,  # type: ignore[arg-type]
-                )
-                moved_untouched.add(component_type)
-
-        for component_type in component_types:
-            if component_type in (new_types - old_types) or component_type in moved_untouched:
-                self._ensure_placeholder(
-                    vehicle_dto,
-                    repair.id,
-                    component_type,
-                    request.repair_date,
-                    request.km_at_repair,
-                )
+        self._update_vehicle_km(update.vehicle_dto, update.km_at_repair)
+        moved_untouched = self._sync_existing_placeholders(update)
+        self._create_missing_placeholders(update, moved_untouched)
 
         if commit:
             self.db.commit()
 
-        return self.repository.find_by_id(repair_id) or saved
+        return self.repository.find_by_id(update.repair.id or 0) or saved
+
+    def _sync_existing_placeholders(
+        self,
+        update: _RepairUpdate,
+    ) -> set[ComponentType]:
+        """Удалить/отвязать лишние placeholders и вернуть перемещённые."""
+        removed_types = update.old_types - update.new_types
+        location_changed = (
+            update.old_date != update.repair_date
+            or update.old_km != update.km_at_repair
+        )
+        moved_untouched: set[ComponentType] = set()
+
+        for replacement in update.linked:
+            untouched = self._is_untouched_placeholder(
+                replacement,
+                update.old_date,
+                update.old_km,
+            )
+            if replacement.component_type in removed_types:
+                self._remove_or_detach_placeholder(replacement, untouched)
+                continue
+
+            if untouched and location_changed:
+                self._delete_placeholder(replacement)
+                moved_untouched.add(replacement.component_type)
+
+        return moved_untouched
+
+    def _create_missing_placeholders(
+        self,
+        update: _RepairUpdate,
+        moved_untouched: set[ComponentType],
+    ) -> None:
+        """Создать placeholders для новых и перемещённых компонентов."""
+        added_types = update.new_types - update.old_types
+        for component_type in update.component_types:
+            if component_type in added_types or component_type in moved_untouched:
+                self._ensure_placeholder(
+                    update.vehicle_dto,
+                    update.repair.id or 0,
+                    component_type,
+                    update.repair_date,
+                    update.km_at_repair,
+                )
+
+    def _remove_or_detach_placeholder(
+        self,
+        replacement: ReplacementDTO,
+        untouched: bool,
+    ) -> None:
+        """Удалить нетронутый placeholder или отвязать изменённый."""
+        if untouched:
+            self._delete_placeholder(replacement)
+            return
+
+        replacement.source_repair_id = None
+        self.replacement_repository.save(replacement, commit=False)
+
+    def _delete_placeholder(self, replacement: ReplacementDTO) -> None:
+        """Удалить placeholder, если у него есть id."""
+        if replacement.id is not None:
+            self.replacement_repository.delete(replacement.id, commit=False)
 
     def delete(self, repair_id: int, commit: bool = True) -> bool:
         """Удалить ремонт, удалив нетронутые и отвязав изменённые замены."""
@@ -252,17 +324,12 @@ class RepairService:
 
         linked = self.replacement_repository.find_by_source_repair_id(repair_id)
         for replacement in linked:
-            if self._is_untouched_placeholder(
+            untouched = self._is_untouched_placeholder(
                 replacement,
                 repair.repair_date,
                 repair.km_at_repair,
-            ):
-                self.replacement_repository.delete(
-                    replacement.id, commit=False,  # type: ignore[arg-type]
-                )
-            else:
-                replacement.source_repair_id = None
-                self.replacement_repository.save(replacement, commit=False)
+            )
+            self._remove_or_detach_placeholder(replacement, untouched)
 
         self.repository.delete(repair_id, commit=commit)
         return True

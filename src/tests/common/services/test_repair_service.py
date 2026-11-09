@@ -246,6 +246,66 @@ class TestRepairUpdate:
         assert len(replacements) == 1
         assert replacements[0].replacement_date == date(2026, 5, 11)
 
+    def test_moves_untouched_placeholder_when_date_and_km_change(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = RepairService(db_session)
+        repair = service.create(vehicle.id, _request(), vehicle)
+
+        service.update(
+            repair.id,  # type: ignore[arg-type]
+            _request(repair_date=date(2026, 5, 11), km_at_repair=13000),
+        )
+
+        replacements = _linked(db_session, repair.id)
+        assert len(replacements) == 1
+        assert replacements[0].replacement_date == date(2026, 5, 11)
+        assert replacements[0].km_at_replacement == 13000
+        assert VehicleRepository(db_session).find_by_id(1).current_km == 13000  # type: ignore[union-attr]
+
+    def test_adds_new_placeholder_at_new_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = RepairService(db_session)
+        repair = service.create(vehicle.id, _request(), vehicle)
+
+        service.update(
+            repair.id,  # type: ignore[arg-type]
+            _request(
+                repair_date=date(2026, 5, 11),
+                component_types=[ComponentType.ENGINE_OIL, ComponentType.COOLANT],
+            ),
+        )
+
+        replacements = _linked(db_session, repair.id)
+        assert {item.component_type for item in replacements} == {
+            ComponentType.ENGINE_OIL,
+            ComponentType.COOLANT,
+        }
+        assert all(item.replacement_date == date(2026, 5, 11) for item in replacements)
+
+    def test_rejects_priced_replacement_on_new_repair_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = RepairService(db_session)
+        repair = service.create(vehicle.id, _request(), vehicle)
+        ReplacementRepository(db_session).save(
+            _replacement(ComponentType.ENGINE_OIL, date(2026, 5, 11), 12000, 1000)
+        )
+
+        with pytest.raises(ValueError, match='замена с ценой'):
+            service.update(
+                repair.id,  # type: ignore[arg-type]
+                _request(repair_date=date(2026, 5, 11)),
+            )
+
+    def test_update_returns_none_for_missing_repair(
+        self, db_session: Session,
+    ) -> None:
+        service = RepairService(db_session)
+
+        assert service.update(999, _request()) is None
+
     def test_keeps_touched_placeholder_when_date_changes(
         self, db_session: Session, vehicle: VehicleDTO,
     ) -> None:

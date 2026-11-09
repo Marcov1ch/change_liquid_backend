@@ -556,28 +556,59 @@ class ReplacementService:
             prev, next_r = self.repository.find_neighbors(
                 vehicle_id, component_type, km, exclude_id,
             )
-            if prev:
-                if km < prev.km_at_replacement:
-                    raise ValueError(
-                        _MSG_KM_LESS_THAN_PREVIOUS.format(km=km, previous_km=prev.km_at_replacement))
-                if date_val < prev.replacement_date:
-                    raise ValueError(
-                        _MSG_DATE_LESS_THAN_PREVIOUS.format(date=date_val, previous_date=prev.replacement_date))
-            if next_r:
-                if km > next_r.km_at_replacement:
-                    raise ValueError(
-                        _MSG_KM_GREATER_THAN_NEXT.format(km=km, next_km=next_r.km_at_replacement))
-                if date_val > next_r.replacement_date:
-                    raise ValueError(
-                        _MSG_DATE_GREATER_THAN_NEXT.format(date=date_val, next_date=next_r.replacement_date))
+            self._validate_previous(prev, km, date_val)
+            self._validate_next(next_r, km, date_val)
             return
 
-        if km < last.km_at_replacement:
+        self._validate_previous(last, km, date_val)
+
+    @staticmethod
+    def _validate_previous(
+        previous: ReplacementDTO | None,
+        km: int,
+        date_val: date,
+    ) -> None:
+        """Проверить, что замена не раньше и не меньше предыдущей."""
+        if not previous:
+            return
+        if km < previous.km_at_replacement:
             raise ValueError(
-                _MSG_KM_LESS_THAN_PREVIOUS.format(km=km, previous_km=last.km_at_replacement))
-        if date_val < last.replacement_date:
+                _MSG_KM_LESS_THAN_PREVIOUS.format(
+                    km=km,
+                    previous_km=previous.km_at_replacement,
+                )
+            )
+        if date_val < previous.replacement_date:
             raise ValueError(
-                _MSG_DATE_LESS_THAN_PREVIOUS.format(date=date_val, previous_date=last.replacement_date))
+                _MSG_DATE_LESS_THAN_PREVIOUS.format(
+                    date=date_val,
+                    previous_date=previous.replacement_date,
+                )
+            )
+
+    @staticmethod
+    def _validate_next(
+        next_replacement: ReplacementDTO | None,
+        km: int,
+        date_val: date,
+    ) -> None:
+        """Проверить, что замена не позже и не больше следующей."""
+        if not next_replacement:
+            return
+        if km > next_replacement.km_at_replacement:
+            raise ValueError(
+                _MSG_KM_GREATER_THAN_NEXT.format(
+                    km=km,
+                    next_km=next_replacement.km_at_replacement,
+                )
+            )
+        if date_val > next_replacement.replacement_date:
+            raise ValueError(
+                _MSG_DATE_GREATER_THAN_NEXT.format(
+                    date=date_val,
+                    next_date=next_replacement.replacement_date,
+                )
+            )
 
     def _validate_no_duplicate(
         self,

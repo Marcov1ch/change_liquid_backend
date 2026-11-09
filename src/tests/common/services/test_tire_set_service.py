@@ -489,6 +489,98 @@ class TestTireSetInstall:
                 vehicle,
             )
 
+    def test_update_clears_next_change_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+        tire_set = service.create(
+            1, TireSetCreateRequest(name='Зимние', season=TireSeason.WINTER), vehicle,
+        )
+        assert tire_set.id is not None
+        service.install(
+            1,
+            tire_set.id,
+            TireInstallRequest(
+                switch_date=date.today(),
+                next_change_date=date.today() + timedelta(days=30),
+            ),
+            vehicle,
+        )
+
+        updated = service.update(
+            tire_set.id,
+            TireSetUpdateRequest(next_change_date=None),
+            vehicle,
+        )
+
+        assert updated.next_change_date is None
+        install = ReplacementRepository(db_session).get_last_install_for_tire_set(
+            tire_set.id,
+        )
+        assert install is not None
+        assert install.next_change_date is None
+
+    def test_update_rejects_next_change_date_before_install_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+        tire_set = service.create(
+            1, TireSetCreateRequest(name='Зимние', season=TireSeason.WINTER), vehicle,
+        )
+        assert tire_set.id is not None
+        service.install(
+            1,
+            tire_set.id,
+            TireInstallRequest(switch_date=date.today()),
+            vehicle,
+        )
+
+        with pytest.raises(ValueError, match='раньше даты установки'):
+            service.update(
+                tire_set.id,
+                TireSetUpdateRequest(
+                    next_change_date=date.today() - timedelta(days=1),
+                ),
+                vehicle,
+            )
+
+    def test_install_rejects_future_switch_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+        tire_set = service.create(
+            1, TireSetCreateRequest(name='Зимние', season=TireSeason.WINTER), vehicle,
+        )
+        assert tire_set.id is not None
+
+        with pytest.raises(ValueError, match='позже сегодняшнего'):
+            service.install(
+                1,
+                tire_set.id,
+                TireInstallRequest(switch_date=date.today() + timedelta(days=1)),
+                vehicle,
+            )
+
+    def test_install_rejects_next_date_before_switch_date(
+        self, db_session: Session, vehicle: VehicleDTO,
+    ) -> None:
+        service = TireSetService(db_session)
+        tire_set = service.create(
+            1, TireSetCreateRequest(name='Зимние', season=TireSeason.WINTER), vehicle,
+        )
+        assert tire_set.id is not None
+
+        with pytest.raises(ValueError, match='раньше даты переключения'):
+            service.install(
+                1,
+                tire_set.id,
+                TireInstallRequest(
+                    switch_date=date.today(),
+                    next_change_date=date.today() - timedelta(days=1),
+                ),
+                vehicle,
+            )
+
     def test_cannot_install_already_installed_set(
         self, db_session: Session, vehicle: VehicleDTO,
     ) -> None:
