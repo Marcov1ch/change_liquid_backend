@@ -1,6 +1,6 @@
 from dataclasses import asdict
 from datetime import date
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,33 @@ class ReplacementRepository:
         if candidate.km_at_replacement != current.km_at_replacement:
             return bool(candidate.km_at_replacement > current.km_at_replacement)
         return bool((candidate.id or 0) > (current.id or 0))
+
+    @classmethod
+    def _latest_row(
+        cls,
+        rows: Iterable[ReplacementDB],
+    ) -> Optional[ReplacementDB]:
+        """Выбрать самую свежую запись из набора."""
+        best: Optional[ReplacementDB] = None
+        for row in rows:
+            if best is None or cls._is_newer_row(row, best):
+                best = row
+        return best
+
+    @classmethod
+    def _latest_by_component_type(
+        cls,
+        rows: Iterable[ReplacementDB],
+    ) -> dict[str, ReplacementDB]:
+        """Выбрать самую свежую запись по каждому типу, кроме purchase-событий."""
+        best_by_type: dict[str, ReplacementDB] = {}
+        for row in rows:
+            if cls._is_tire_purchase(row):
+                continue
+            current = best_by_type.get(row.component_type)
+            if current is None or cls._is_newer_row(row, current):
+                best_by_type[row.component_type] = row
+        return best_by_type
 
     @staticmethod
     def _to_dto(db_row: ReplacementDB) -> ReplacementDTO:
@@ -134,15 +161,7 @@ class ReplacementRepository:
             ReplacementDB.vehicle_id == vehicle_id,
         ).all()
 
-        best_by_type: dict[str, ReplacementDB] = {}
-        for replacement in rows:
-            if self._is_tire_purchase(replacement):
-                continue
-            key = replacement.component_type
-            current = best_by_type.get(key)
-            if current is None or self._is_newer_row(replacement, current):
-                best_by_type[key] = replacement
-
+        best_by_type = self._latest_by_component_type(rows)
         return {r.id for r in best_by_type.values() if r.id is not None}
 
     def find_by_vehicle_and_component(
@@ -199,14 +218,8 @@ class ReplacementRepository:
             ReplacementDB.tire_set_id == tire_set_id,
             ReplacementDB.tire_event_type == TireEventType.INSTALL.value,
         ).all()
-        if not rows:
-            return None
-
-        best = rows[0]
-        for row in rows[1:]:
-            if self._is_newer_row(row, best):
-                best = row
-        return self._to_dto(best)
+        best = self._latest_row(rows)
+        return self._to_dto(best) if best else None
 
     def find_tire_event(
         self,
@@ -264,16 +277,8 @@ class ReplacementRepository:
             ReplacementDB.component_type == component_type.value
         ).all()
 
-        rows = [row for row in rows if not self._is_tire_purchase(row)]
-        if not rows:
-            return None
-
-        best = rows[0]
-        for row in rows[1:]:
-            if self._is_newer_row(row, best):
-                best = row
-
-        return self._to_dto(best)
+        best = self._latest_by_component_type(rows).get(component_type.value)
+        return self._to_dto(best) if best else None
 
     def find_previous_replacement(
         self,
@@ -336,14 +341,9 @@ class ReplacementRepository:
             ReplacementDB.component_type == component_type.value
         ).all()
 
-        rows = [row for row in rows if not self._is_tire_purchase(row)]
-        if not rows:
+        db_replacement = self._latest_by_component_type(rows).get(component_type.value)
+        if not db_replacement:
             return None
-
-        db_replacement = rows[0]
-        for row in rows[1:]:
-            if self._is_newer_row(row, db_replacement):
-                db_replacement = row
 
         return {
             "id": db_replacement.id,
@@ -369,14 +369,7 @@ class ReplacementRepository:
             ReplacementDB.vehicle_id == vehicle_id,
         ).all()
 
-        best_by_type: dict[str, ReplacementDB] = {}
-        for replacement in rows:
-            if self._is_tire_purchase(replacement):
-                continue
-            key = replacement.component_type
-            current = best_by_type.get(key)
-            if current is None or self._is_newer_row(replacement, current):
-                best_by_type[key] = replacement
+        best_by_type = self._latest_by_component_type(rows)
 
         return [
             {
