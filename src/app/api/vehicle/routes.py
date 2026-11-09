@@ -1,0 +1,72 @@
+from fastapi import APIRouter
+
+from app.api.vehicle.handler import vehicle_handler
+
+router = APIRouter()
+
+router.add_api_route(
+    "/vehicles",
+    vehicle_handler.get_vehicles,
+    methods=["GET"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}",
+    vehicle_handler.get_vehicle,
+    methods=["GET"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles",
+    vehicle_handler.create_vehicle,
+    methods=["POST"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}/km",
+    vehicle_handler.update_vehicle_km,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}",
+    vehicle_handler.update_vehicle,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}/restore",
+    vehicle_handler.restore_vehicle,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}/notify",
+    vehicle_handler.update_notify,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}/sizes",
+    vehicle_handler.update_sizes,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}/intervals",
+    vehicle_handler.update_vehicle_intervals,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}",
+    vehicle_handler.delete_vehicle,
+    methods=["DELETE"],
+    tags=["vehicles"],
+)
+router.add_api_route(
+    "/vehicles/{vehicle_id}/hard",
+    vehicle_handler.hard_delete_vehicle,
+    methods=["DELETE"],
+    tags=["vehicles"],
+)
