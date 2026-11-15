@@ -65,6 +65,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 | `SMTP_PASSWORD` | нет | — | Пароль SMTP |
 | `SMTP_FROM` | нет | `SMTP_USER` | Отправитель писем |
 | `FRONTEND_URL` | нет | `http://localhost:5173` | Адрес фронтенда для ссылок в письмах и публичных QR-ссылок |
+| `CORS_ORIGINS` | нет | `https://localhost,capacitor://localhost` | Разрешённые origin для CORS-клиентов (Capacitor) |
 | `CURRENCY_RATES_URL` | нет | `https://www.cbr-xml-daily.ru/daily_json.js` | Источник курсов валют |
 | `CURRENCY_RATES_TTL_SECONDS` | нет | `21600` | Время жизни кеша курсов |
 | `CURRENCY_FALLBACK_USD` | нет | `90` | Резервный курс USD |

@@ -9,6 +9,7 @@ from app.api.routes import setup_routes
 from app.db.database import init_db
 from app.db.migrate import run_migrations
 from app.auth.router import router as auth_router
+from app.common.cors import setup_cors
 from app.common.middleware import LoggingMiddleware
 from app.services.scheduler import start_scheduler
 
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(LoggingMiddleware)
+    setup_cors(app)
 
     app.include_router(auth_router)
 
