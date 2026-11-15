@@ -90,6 +90,7 @@
 - **Breaking changes**. Если изменение всё же ломающие — **обязательно** согласуйте с фронтендом и синхронизируйте изменения в обоих репозиториях. При таких изменениях отразите суть в `CHANGELOG.md` (ориентируйтесь на существующий стиль файла).
 - **Деньги и валюта**. Денежные поля API теперь в валюте пользователя (`User.currency`), а не всегда в рублях. Публичный профиль отдаёт `PublicVehicle.currency`. Старый фронтенд без валюты будет подписывать суммы как `₽`, поэтому бэкенд и фронтенд нужно релизить синхронно.
 - **Проверка фронтенда**. После изменений API прогоняйте в `../change_liquid_frontend`: `npm run lint`, `npm run build`, `npm test`.
+- **Capacitor/Android**. Мобильный клиент ходит на API с origin `https://localhost`; для него в `CORS_ORIGINS` должны быть разрешены `https://localhost` и `capacitor://localhost`. Сборка APK описана в `../change_liquid_frontend/README.md`.
 - **Где хранить openapi**. В этом репозитории **нет** статичного `openapi.yaml`. Единый источник правды — живой `openapi.json` от запущенного FastAPI-приложения.
 
 ## Коммиты и Pull Request
@@ -100,7 +101,7 @@
 
 ## Конфигурация и окружение
 
-- Переменные окружения берутся из `.env` (см. `.env.example`). Обязательные: `SECRET_KEY`. Опциональные: `DB_PATH`, `SMTP_HOST/PORT/USER/PASSWORD/FROM`, `FRONTEND_URL`, `CURRENCY_RATES_URL`, `CURRENCY_RATES_TTL_SECONDS`, `CURRENCY_FALLBACK_USD`, `CURRENCY_FALLBACK_BYN`, `CURRENCY_FALLBACK_EUR`.
+- Переменные окружения берутся из `.env` (см. `.env.example`). Обязательные: `SECRET_KEY`. Опциональные: `DB_PATH`, `SMTP_HOST/PORT/USER/PASSWORD/FROM`, `FRONTEND_URL`, `CORS_ORIGINS`, `CURRENCY_RATES_URL`, `CURRENCY_RATES_TTL_SECONDS`, `CURRENCY_FALLBACK_USD`, `CURRENCY_FALLBACK_BYN`, `CURRENCY_FALLBACK_EUR`.
 - Email-уведомления и планировщик (APScheduler) стартуют при запуске приложения.
 - `data/app.db` хранится в `data/`. Директория `data/` и файлы `*.db`/`*.sqlite*` игнорируются git (`.gitignore`). **Никогда** не коммитьте локальную БД.
 
