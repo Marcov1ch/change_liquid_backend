@@ -4,6 +4,15 @@ Backend-сервис для учёта замены технических жи�
 
 Доменные правила (статусы, компоненты, интервалы, уведомления) — в [DOMAIN.md](DOMAIN.md).
 
+## Клиенты
+
+Бэкенд обслуживает два независимых клиента (рядом в workspace):
+
+- `../change_liquid_frontend` — веб-приложение (React + Vite).
+- `../change_liquid_android` — Android-приложение (Capacitor + React) с собственным UI-кодом; дизайн развивается отдельно от web.
+
+Оба клиента работают с одним API. При изменении контракта проверяйте оба репозитория (см. [AGENTS.md](AGENTS.md), раздел «Связь с клиентами»).
+
 ## Возможности
 
 - Учёт автомобилей (марка/модель из справочника, госномер свободного формата до 15 символов, пробег)
@@ -64,8 +73,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 | `SMTP_USER` | нет | — | Логин SMTP |
 | `SMTP_PASSWORD` | нет | — | Пароль SMTP |
 | `SMTP_FROM` | нет | `SMTP_USER` | Отправитель писем |
-| `FRONTEND_URL` | нет | `http://localhost:5173` | Адрес фронтенда для ссылок в письмах и публичных QR-ссылок |
-| `CORS_ORIGINS` | нет | `https://localhost,capacitor://localhost` | Разрешённые origin для CORS-клиентов (Capacitor) |
+| `FRONTEND_URL` | нет | `http://localhost:5173` | Адрес web-фронтенда для ссылок в письмах и публичных QR-ссылок |
+| `CORS_ORIGINS` | нет | `https://localhost,capacitor://localhost` | Разрешённые origin для CORS-клиентов (web и Android/Capacitor) |
 | `CURRENCY_RATES_URL` | нет | `https://www.cbr-xml-daily.ru/daily_json.js` | Источник курсов валют |
 | `CURRENCY_RATES_TTL_SECONDS` | нет | `21600` | Время жизни кеша курсов |
 | `CURRENCY_FALLBACK_USD` | нет | `90` | Резервный курс USD |
@@ -102,4 +111,4 @@ make clean    # очистка кэшей (__pycache__, .pytest_cache, .mypy_cac
 
 ## Деплой
 
-Production-сборка через `docker compose` (backend + frontend + Caddy). Автодеплой выполняется CI при пуше в `master`. Подробнее об окружении — в [CONTRIBUTING.md](CONTRIBUTING.md).
+Production-сборка через `docker compose` (backend + web-фронтенд + Caddy). Автодеплой выполняется CI при пуше в `master`. Подробнее об окружении — в [CONTRIBUTING.md](CONTRIBUTING.md).
