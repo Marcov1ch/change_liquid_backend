@@ -44,8 +44,8 @@ REPAIR_PLACEHOLDER_NAME = 'ВНЕСИТЕ ИЗМЕНЕНИЕ'
 class _ReplacementUpdate:
     """Итоговые значения замены после частичного обновления."""
     component_name: str | None
-    component_price: int | None
-    work_price: int | None
+    component_price: float | None
+    work_price: float | None
     replacement_date: date
     km_at_replacement: int
     next_change_date: date | None
@@ -528,8 +528,8 @@ class ReplacementService:
         vehicle_id: int,
         component_type: ComponentType,
         replacement_date: date,
-        component_price: int | None,
-        work_price: int | None,
+        component_price: float | None,
+        work_price: float | None,
     ) -> None:
         """Запретить стоимость замены, если компонент входит в ремонт на эту дату."""
         has_price = (component_price or 0) > 0 or (work_price or 0) > 0

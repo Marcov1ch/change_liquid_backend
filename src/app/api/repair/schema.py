@@ -32,15 +32,15 @@ class RepairCreateRequest(BaseModel):
         max_length=2000,
         description='Описание работ',
     )
-    work_cost: int = Field(
+    work_cost: float = Field(
         ...,
         ge=0,
-        description='Стоимость работ',
+        description='Стоимость работ в валюте пользователя',
     )
-    parts_cost: int = Field(
+    parts_cost: float = Field(
         ...,
         ge=0,
-        description='Стоимость запчастей',
+        description='Стоимость запчастей в валюте пользователя',
     )
     component_types: list[ComponentType] = Field(
         default_factory=list,
@@ -79,13 +79,13 @@ class RepairResponse(BaseModel):
         None,
         description='Описание работ',
     )
-    work_cost: int = Field(
+    work_cost: float = Field(
         ...,
-        description='Стоимость работ',
+        description='Стоимость работ в валюте пользователя',
     )
-    parts_cost: int = Field(
+    parts_cost: float = Field(
         ...,
-        description='Стоимость запчастей',
+        description='Стоимость запчастей в валюте пользователя',
     )
     component_types: list[ComponentType] = Field(
         default_factory=list,

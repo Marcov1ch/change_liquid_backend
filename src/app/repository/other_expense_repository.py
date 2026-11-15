@@ -18,7 +18,7 @@ class OtherExpenseRepository:
             vehicle_id=db_expense.vehicle_id,
             name=db_expense.name,
             expense_date=db_expense.expense_date,
-            amount=db_expense.amount,
+            amount=float(db_expense.amount),
         )
 
     def save(self, expense: OtherExpenseDTO, commit: bool = True) -> OtherExpenseDTO:

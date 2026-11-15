@@ -92,11 +92,11 @@ class UpdateReplacementRequest(BaseModel):
         min_length=1,
         max_length=100,
     )
-    component_price: int | None = Field(
+    component_price: float | None = Field(
         None,
         ge=0,
     )
-    work_price: int | None = Field(
+    work_price: float | None = Field(
         None,
         ge=0,
     )

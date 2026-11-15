@@ -39,13 +39,13 @@ class PublicReplacementResponse(BaseModel):
         ...,
         description='Название компонента',
     )
-    component_price: int | None = Field(
+    component_price: float | None = Field(
         None,
-        description='Цена компонента',
+        description='Цена компонента в валюте владельца',
     )
-    work_price: int | None = Field(
+    work_price: float | None = Field(
         None,
-        description='Стоимость работы',
+        description='Стоимость работы в валюте владельца',
     )
     replacement_date: date = Field(
         ...,
@@ -111,9 +111,9 @@ class PublicTireSetResponse(BaseModel):
         None,
         description='Дата покупки',
     )
-    purchase_price: int | None = Field(
+    purchase_price: float | None = Field(
         None,
-        description='Стоимость покупки',
+        description='Стоимость покупки в валюте владельца',
     )
     is_installed: bool = Field(
         ...,
@@ -155,9 +155,9 @@ class PublicOtherExpenseResponse(BaseModel):
         ...,
         description='Дата траты',
     )
-    amount: int = Field(
+    amount: float = Field(
         ...,
-        description='Стоимость траты в рублях',
+        description='Стоимость траты в валюте владельца',
     )
 
 
@@ -179,13 +179,13 @@ class PublicRepairResponse(BaseModel):
         None,
         description='Описание работ',
     )
-    work_cost: int = Field(
+    work_cost: float = Field(
         ...,
-        description='Стоимость работ',
+        description='Стоимость работ в валюте владельца',
     )
-    parts_cost: int = Field(
+    parts_cost: float = Field(
         ...,
-        description='Стоимость запчастей',
+        description='Стоимость запчастей в валюте владельца',
     )
     component_types: list[ComponentType] = Field(
         default_factory=list,
@@ -211,9 +211,9 @@ class PublicFuelRecordResponse(BaseModel):
         ...,
         description='Объём топлива в литрах',
     )
-    total_cost: int = Field(
+    total_cost: float = Field(
         ...,
-        description='Стоимость заправки в рублях',
+        description='Стоимость заправки в валюте владельца',
     )
     consumption_l_per_100km: float | None = Field(
         None,
@@ -234,6 +234,10 @@ class PublicVehicleResponse(BaseModel):
     plate_number: str = Field(
         ...,
         description='Рег. номер',
+    )
+    currency: str = Field(
+        'RUB',
+        description='Валюта владельца',
     )
     year: int = Field(
         ...,

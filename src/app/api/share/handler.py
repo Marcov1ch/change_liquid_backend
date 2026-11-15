@@ -201,6 +201,7 @@ class ShareHandler:
                 brand=vehicle.brand,
                 model=vehicle.model,
                 plate_number=vehicle.plate_number,
+                currency=vehicle.owner_currency,
                 year=vehicle.year,
                 current_km=vehicle.current_km,
                 vehicle_status=StatusCalculator.get_vehicle_status(vehicle, replacements),

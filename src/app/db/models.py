@@ -6,6 +6,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -51,6 +52,8 @@ class UserDB(Base):  # type: ignore
     email_verified = Column(Boolean, nullable=False, default=False, server_default="0")
     is_active = Column(Boolean, default=True)
     token_version = Column(Integer, nullable=False, server_default="0", default=0)
+    currency = Column(String(3), nullable=False, default="RUB", server_default="RUB")
+    profile_visited = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     vehicles = relationship("VehicleDB", back_populates="owner")
@@ -152,7 +155,7 @@ class TireSetDB(Base):  # type: ignore
     name = Column(String, nullable=False)
     season = Column(String, nullable=False, default="all_season")
     purchase_date = Column(Date, nullable=True)
-    purchase_price = Column(Integer, nullable=True)
+    purchase_price = Column(Numeric(12, 2), nullable=True)
     accumulated_km = Column(Integer, nullable=False, default=0, server_default="0")
     installed_km = Column(Integer, nullable=True)
     installed_date = Column(Date, nullable=True)
@@ -195,8 +198,8 @@ class ReplacementDB(Base):  # type: ignore
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     component_type = Column(String, nullable=False)
     component_name = Column(String, nullable=False)
-    component_price = Column(Integer, nullable=True)
-    work_price = Column(Integer, nullable=True)
+    component_price = Column(Numeric(12, 2), nullable=True)
+    work_price = Column(Numeric(12, 2), nullable=True)
     replacement_date = Column(Date, nullable=False)
     km_at_replacement = Column(Integer, nullable=False)
     interval_km = Column(Integer, nullable=False)
@@ -236,7 +239,7 @@ class OtherExpenseDB(Base):  # type: ignore
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     expense_date = Column(Date, nullable=False, index=True)
-    amount = Column(Integer, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
 
     vehicle = relationship("VehicleDB", back_populates="other_expenses")
 
@@ -256,8 +259,8 @@ class RepairDB(Base):  # type: ignore
     repair_date = Column(Date, nullable=False, index=True)
     km_at_repair = Column(Integer, nullable=False)
     description = Column(Text, nullable=True)
-    work_cost = Column(Integer, nullable=False, default=0, server_default="0")
-    parts_cost = Column(Integer, nullable=False, default=0, server_default="0")
+    work_cost = Column(Numeric(12, 2), nullable=False, default=0, server_default="0")
+    parts_cost = Column(Numeric(12, 2), nullable=False, default=0, server_default="0")
 
     vehicle = relationship("VehicleDB", back_populates="repairs")
     components = relationship(
@@ -302,6 +305,6 @@ class FuelRecordDB(Base):  # type: ignore
     fuel_date = Column(Date, nullable=False, index=True)
     km_at_fuel = Column(Integer, nullable=False)
     liters = Column(Float, nullable=False)
-    total_cost = Column(Integer, nullable=False)
+    total_cost = Column(Numeric(12, 2), nullable=False)
 
     vehicle = relationship("VehicleDB", back_populates="fuel_records")

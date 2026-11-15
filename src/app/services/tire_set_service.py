@@ -49,7 +49,7 @@ class _TireInstall:
     target: TireSetDTO
     switch_date: date
     next_change_date: date | None
-    work_price: int | None
+    work_price: float | None
 
 
 class TireSetService:
@@ -473,7 +473,7 @@ class TireSetService:
     @staticmethod
     def _resolve_purchase_date(
         purchase_date: date | None,
-        purchase_price: int | None,
+        purchase_price: float | None,
     ) -> date | None:
         """Подставить сегодняшнюю дату, если покупка платная и дата не указана."""
         if purchase_date is None and (purchase_price or 0) > 0:
@@ -483,7 +483,7 @@ class TireSetService:
     @staticmethod
     def _validate_purchase(
         purchase_date: date | None,
-        purchase_price: int | None,
+        purchase_price: float | None,
     ) -> None:
         """Проверить дату и стоимость покупки комплекта."""
         if purchase_date is not None and purchase_date > date.today():

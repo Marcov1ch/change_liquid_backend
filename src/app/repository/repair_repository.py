@@ -23,8 +23,8 @@ class RepairRepository:
             repair_date=db_repair.repair_date,
             km_at_repair=db_repair.km_at_repair,
             description=db_repair.description,
-            work_cost=db_repair.work_cost,
-            parts_cost=db_repair.parts_cost,
+            work_cost=float(db_repair.work_cost),
+            parts_cost=float(db_repair.parts_cost),
             component_types=[
                 ComponentType(component.component_type)
                 for component in sorted(db_repair.components, key=lambda c: c.id or 0)

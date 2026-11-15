@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter
 
+from app.api.currency.routes import router as currency_router
 from app.api.enums.routes import router as enums_router
 from app.api.fuel_record.routes import router as fuel_record_router
 from app.api.other_expense.routes import router as other_expense_router
@@ -22,5 +23,6 @@ def setup_routes(app: FastAPI) -> None:
     router.include_router(repair_router)
     router.include_router(share_router)
     router.include_router(enums_router)
+    router.include_router(currency_router)
 
     app.include_router(router)

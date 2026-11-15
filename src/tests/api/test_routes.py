@@ -50,6 +50,7 @@ _EXPECTED_ROUTES: set[tuple[str, str, tuple[str, ...]]] = {
     ('/api/v1/enums/models/{brand}', 'GET', ('enums',)),
     ('/api/v1/enums/components', 'GET', ('enums',)),
     ('/api/v1/enums/component-configs', 'GET', ('enums',)),
+    ('/api/v1/currency/conversion-preview', 'GET', ('currency',)),
 }
 
 

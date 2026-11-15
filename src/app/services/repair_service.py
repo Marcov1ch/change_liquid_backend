@@ -31,8 +31,8 @@ class _RepairUpdate:
     description: str | None
     repair_date: date
     km_at_repair: int
-    work_cost: int
-    parts_cost: int
+    work_cost: float
+    parts_cost: float
     component_types: list[ComponentType]
     old_date: date
     old_km: int
@@ -62,7 +62,7 @@ class RepairService:
             raise ValueError(_MSG_NEGATIVE_KM)
 
     @staticmethod
-    def _validate_costs(work_cost: int, parts_cost: int) -> None:
+    def _validate_costs(work_cost: float, parts_cost: float) -> None:
         if work_cost < 0 or parts_cost < 0:
             raise ValueError(_MSG_NEGATIVE_COST)
 
