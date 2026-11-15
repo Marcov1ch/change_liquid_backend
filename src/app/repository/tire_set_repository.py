@@ -29,7 +29,7 @@ class TireSetRepository:
             name=db_row.name,
             season=db_row.season,
             purchase_date=db_row.purchase_date,
-            purchase_price=db_row.purchase_price,
+            purchase_price=float(db_row.purchase_price) if db_row.purchase_price is not None else None,
             accumulated_km=db_row.accumulated_km,
             installed_km=db_row.installed_km,
             installed_date=db_row.installed_date,

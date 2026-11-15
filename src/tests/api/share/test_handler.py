@@ -21,7 +21,7 @@ def _vehicle(share_token: str | None = 'tok') -> VehicleDTO:
     return VehicleDTO(
         id=1, brand='VW', model='Golf', brand_id=1, model_id=1,
         plate_number='А123АА178', year=2015, current_km=20000,
-        is_active=True, owner_id=1,
+        is_active=True, owner_id=1, owner_currency='EUR',
         share_token=share_token,
         intervals={'engine_oil': 7000},
         notify_flags={},
@@ -127,6 +127,7 @@ def test_public_vehicle_returns_history_and_register_url() -> None:
 
     assert response.brand == 'VW'
     assert response.plate_number == 'А123АА178'
+    assert response.currency == 'EUR'
     assert response.vehicle_status == StatusEnum.GOOD.value
     assert response.register_url == 'http://front/register'
     assert len(response.replacements) == 1

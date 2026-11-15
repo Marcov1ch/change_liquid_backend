@@ -31,7 +31,7 @@ class OtherExpenseService:
         return normalized
 
     @staticmethod
-    def _validate_amount(amount: int) -> None:
+    def _validate_amount(amount: float) -> None:
         """Проверить, что стоимость больше 0."""
         if amount <= 0:
             raise ValueError(_MSG_AMOUNT_POSITIVE)
@@ -75,7 +75,7 @@ class OtherExpenseService:
         *,
         name: str | None = None,
         expense_date: date | None = None,
-        amount: int | None = None,
+        amount: float | None = None,
     ) -> OtherExpenseDTO | None:
         """Частично обновить запись о прочей трате."""
         expense = self.repository.find_by_id(expense_id)

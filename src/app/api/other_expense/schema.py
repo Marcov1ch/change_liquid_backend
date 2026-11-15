@@ -16,10 +16,10 @@ class OtherExpenseCreateRequest(BaseModel):
         description='Дата траты',
         examples=['2024-01-15'],
     )
-    amount: int = Field(
+    amount: float = Field(
         ...,
-        description='Стоимость траты в рублях',
-        examples=[500],
+        description='Стоимость траты в валюте пользователя',
+        examples=[500.0],
         gt=0,
     )
 
@@ -32,7 +32,7 @@ class OtherExpenseUpdateRequest(BaseModel):
         max_length=100,
     )
     expense_date: date | None = None
-    amount: int | None = Field(
+    amount: float | None = Field(
         None,
         gt=0,
     )
@@ -56,7 +56,7 @@ class OtherExpenseResponse(BaseModel):
         ...,
         description='Дата траты',
     )
-    amount: int = Field(
+    amount: float = Field(
         ...,
-        description='Стоимость траты в рублях',
+        description='Стоимость траты в валюте пользователя',
     )

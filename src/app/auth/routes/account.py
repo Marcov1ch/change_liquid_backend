@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -6,7 +8,9 @@ from app.auth.jwt import get_current_user
 from app.auth.password import hash_password, verify_password
 from app.auth.schemas import (
     ChangePasswordRequest,
+    CurrencyChangeResponse,
     MessageResponse,
+    UpdateCurrencyRequest,
     UpdateEmailRequest,
     UserResponse,
 )
@@ -17,6 +21,9 @@ from app.auth.user_service import (
 )
 from app.db.database import get_db
 from app.db.models import UserDB
+from app.services.currency_conversion_service import CurrencyConversionService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -52,6 +59,54 @@ async def update_email(
 
     queue_verification_email(background_tasks, current_user)
 
+    return user_to_response(current_user)
+
+
+@router.patch("/currency", response_model=CurrencyChangeResponse)
+def update_currency(
+    request: UpdateCurrencyRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> CurrencyChangeResponse:
+    """Сменить валюту пользователя с пересчётом всех сумм."""
+    try:
+        result = CurrencyConversionService(db).apply(current_user, request.currency.value)
+    except ValueError as err:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(err),
+        )
+    except Exception:
+        db.rollback()
+        logger.exception('Failed to change user currency')
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail='Не удалось сменить валюту',
+        )
+
+    db.refresh(current_user)
+    return CurrencyChangeResponse(
+        user=user_to_response(current_user),
+        from_currency=result.from_currency,
+        to_currency=result.to_currency,
+        rate=result.rate,
+        records_count=result.records_count,
+        source=result.source,
+        stale=result.stale,
+    )
+
+
+@router.patch("/profile-visited", response_model=UserResponse)
+async def mark_profile_visited(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> UserResponse:
+    """Отметить, что пользователь открыл профиль."""
+    if not current_user.profile_visited:
+        current_user.profile_visited = True
+        db.commit()
+        db.refresh(current_user)
     return user_to_response(current_user)
 
 

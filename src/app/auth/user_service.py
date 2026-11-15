@@ -44,6 +44,8 @@ def user_to_response(user: UserDB) -> UserResponse:
         email=user.email,
         email_verified=user.email_verified,
         is_active=user.is_active,
+        currency=user.currency or "RUB",
+        profile_visited=bool(user.profile_visited),
         created_at=user.created_at,
     )
 

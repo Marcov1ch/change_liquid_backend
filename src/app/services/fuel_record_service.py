@@ -39,7 +39,7 @@ class FuelRecordService:
             raise ValueError(_MSG_NON_POSITIVE_LITERS)
 
     @staticmethod
-    def _validate_cost(total_cost: int) -> None:
+    def _validate_cost(total_cost: float) -> None:
         if total_cost < 0:
             raise ValueError(_MSG_NEGATIVE_COST)
 
@@ -130,7 +130,7 @@ class FuelRecordService:
         fuel_date: date | None = None,
         km_at_fuel: int | None = None,
         liters: float | None = None,
-        total_cost: int | None = None,
+        total_cost: float | None = None,
         commit: bool = True,
     ) -> FuelRecordDTO | None:
         """Частично обновить запись о заправке."""

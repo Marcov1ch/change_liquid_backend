@@ -22,11 +22,11 @@ class FuelRecordCreateRequest(BaseModel):
         gt=0,
         examples=[35.5],
     )
-    total_cost: int = Field(
+    total_cost: float = Field(
         ...,
-        description='Стоимость заправки в рублях',
+        description='Стоимость заправки в валюте пользователя',
         ge=0,
-        examples=[2500],
+        examples=[2500.0],
     )
 
 
@@ -35,7 +35,7 @@ class FuelRecordUpdateRequest(BaseModel):
     fuel_date: date | None = None
     km_at_fuel: int | None = Field(None, ge=0)
     liters: float | None = Field(None, gt=0)
-    total_cost: int | None = Field(None, ge=0)
+    total_cost: float | None = Field(None, ge=0)
 
 
 class FuelRecordResponse(BaseModel):
@@ -60,9 +60,9 @@ class FuelRecordResponse(BaseModel):
         ...,
         description='Объём топлива в литрах',
     )
-    total_cost: int = Field(
+    total_cost: float = Field(
         ...,
-        description='Стоимость заправки в рублях',
+        description='Стоимость заправки в валюте пользователя',
     )
     consumption_l_per_100km: float | None = Field(
         None,

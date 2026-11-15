@@ -16,16 +16,16 @@ class ReplacementBase(BaseModel):
         min_length=1,
         max_length=100,
     )
-    component_price: int | None = Field(
+    component_price: float | None = Field(
         None,
-        description='Цена компонента в рублях',
-        examples=[5000],
+        description='Цена компонента в валюте пользователя',
+        examples=[5000.0],
         ge=0,
     )
-    work_price: int | None = Field(
+    work_price: float | None = Field(
         None,
-        description='Стоимость работы в рублях',
-        examples=[1500],
+        description='Стоимость работы в валюте пользователя',
+        examples=[1500.0],
         ge=0,
     )
 

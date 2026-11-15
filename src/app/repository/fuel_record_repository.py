@@ -19,7 +19,7 @@ class FuelRecordRepository:
             fuel_date=db_record.fuel_date,
             km_at_fuel=db_record.km_at_fuel,
             liters=db_record.liters,
-            total_cost=db_record.total_cost,
+            total_cost=float(db_record.total_cost),
         )
 
     def save(self, record: FuelRecordDTO, commit: bool = True) -> FuelRecordDTO:

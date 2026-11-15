@@ -25,20 +25,20 @@ class TireSetCreateRequest(BaseModel):
         description='Дата покупки комплекта',
         examples=['2026-10-15'],
     )
-    purchase_price: int | None = Field(
+    purchase_price: float | None = Field(
         None,
-        description='Стоимость покупки комплекта в рублях',
-        examples=[30000],
+        description='Стоимость покупки комплекта в валюте пользователя',
+        examples=[30000.0],
         ge=0,
     )
     install_now: bool = Field(
         False,
         description='Установить комплект сразу после добавления',
     )
-    work_price: int | None = Field(
+    work_price: float | None = Field(
         None,
-        description='Стоимость работ по установке в рублях',
-        examples=[1500],
+        description='Стоимость работ по установке в валюте пользователя',
+        examples=[1500.0],
         ge=0,
     )
     next_change_date: date | None = Field(
@@ -64,7 +64,7 @@ class TireSetUpdateRequest(BaseModel):
     )
     season: TireSeason | None = None
     purchase_date: date | None = None
-    purchase_price: int | None = Field(
+    purchase_price: float | None = Field(
         None,
         ge=0,
     )
@@ -88,7 +88,7 @@ class TireSetResponse(BaseModel):
     name: str = Field(..., description='Название комплекта')
     season: TireSeason = Field(..., description='Сезон комплекта')
     purchase_date: date | None = Field(None, description='Дата покупки')
-    purchase_price: int | None = Field(None, description='Стоимость покупки')
+    purchase_price: float | None = Field(None, description='Стоимость покупки')
     accumulated_km: int = Field(..., description='Пробег за завершённые сезоны')
     installed_km: int | None = Field(None, description='Пробег установки текущего сезона')
     installed_date: date | None = Field(None, description='Дата установки текущего сезона')
@@ -121,10 +121,10 @@ class TireInstallRequest(BaseModel):
         description='Дата следующей смены шин',
         examples=['2027-04-01'],
     )
-    work_price: int | None = Field(
+    work_price: float | None = Field(
         None,
-        description='Стоимость работ по установке шин в рублях',
-        examples=[1500],
+        description='Стоимость работ по установке шин в валюте пользователя',
+        examples=[1500.0],
         ge=0,
     )
 

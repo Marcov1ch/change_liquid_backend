@@ -34,7 +34,7 @@ class VehicleRepository:
         return intervals, notify_flags, interval_months
 
     @staticmethod
-    def _to_dto(db_vehicle: VehicleDB) -> VehicleDTO:
+    def _to_dto(db_vehicle: VehicleDB, owner_currency: str = 'RUB') -> VehicleDTO:
         """Преобразовать ORM-модель в DTO."""
         intervals, notify_flags, interval_months = VehicleRepository._intervals_and_flags(db_vehicle)
 
@@ -67,6 +67,7 @@ class VehicleRepository:
             current_km=db_vehicle.current_km,
             is_active=db_vehicle.is_active,
             owner_id=db_vehicle.owner_id,
+            owner_currency=owner_currency,
             share_token=db_vehicle.share_token,
             intervals=intervals,
             notify_flags=notify_flags,
@@ -137,8 +138,15 @@ class VehicleRepository:
 
     def find_by_share_token(self, token: str) -> VehicleDTO | None:
         """Найти авто по публичному токену."""
-        db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.share_token == token).first()
-        return self._to_dto(db_vehicle) if db_vehicle else None
+        from sqlalchemy.orm import joinedload
+
+        db_vehicle = self.db.query(VehicleDB).options(
+            joinedload(VehicleDB.owner),
+        ).filter(VehicleDB.share_token == token).first()
+        if not db_vehicle:
+            return None
+        owner_currency = db_vehicle.owner.currency if db_vehicle.owner else 'RUB'
+        return self._to_dto(db_vehicle, owner_currency or 'RUB')
 
     def set_share_token(self, vehicle_id: int, token: str | None) -> bool:
         """Установить или очистить публичный токен авто."""

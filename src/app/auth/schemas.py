@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
 
+from app.common.enums import Currency
+
 
 class UserCreate(BaseModel):
     """Схема для регистрации пользователя."""
@@ -28,7 +30,25 @@ class UserResponse(BaseModel):
     email: str
     email_verified: bool
     is_active: bool
+    currency: str
+    profile_visited: bool
     created_at: datetime
+
+
+class UpdateCurrencyRequest(BaseModel):
+    """Смена валюты текущего пользователя."""
+    currency: Currency
+
+
+class CurrencyChangeResponse(BaseModel):
+    """Результат смены валюты."""
+    user: UserResponse
+    from_currency: str
+    to_currency: str
+    rate: float | None = None
+    records_count: int = 0
+    source: str
+    stale: bool = False
 
 
 class Token(BaseModel):

@@ -24,6 +24,14 @@ DATE_BASED_COMPONENT_TYPES = frozenset({ComponentType.TIRE_CHANGE}) | DATE_ONLY_
 DATE_BASED_COMPONENT_KEYS = frozenset(component.value for component in DATE_BASED_COMPONENT_TYPES)
 
 
+class Currency(str, Enum):
+    """Допустимые валюты пользователя."""
+    RUB = "RUB"
+    BYN = "BYN"
+    USD = "USD"
+    EUR = "EUR"
+
+
 class TireSeason(Enum):
     """Сезон комплекта шин."""
     SUMMER = "summer"

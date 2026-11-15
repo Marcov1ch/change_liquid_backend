@@ -17,6 +17,7 @@ class VehicleDTO:
     current_km: int
     is_active: bool
     owner_id: int
+    owner_currency: str = 'RUB'
     share_token: str | None = None
     intervals: dict[str, int] = field(default_factory=dict)
     notify_flags: dict[str, bool] = field(default_factory=dict)
@@ -32,7 +33,7 @@ class OtherExpenseDTO:
     vehicle_id: int
     name: str
     expense_date: date
-    amount: int
+    amount: float
 
 
 @dataclass
@@ -42,8 +43,8 @@ class ReplacementDTO:
     vehicle_id: int
     component_type: ComponentType
     component_name: str
-    component_price: int | None
-    work_price: int | None
+    component_price: float | None
+    work_price: float | None
     replacement_date: date
     km_at_replacement: int
     interval_km: int
@@ -62,7 +63,7 @@ class TireSetDTO:
     name: str
     season: str
     purchase_date: date | None = None
-    purchase_price: int | None = None
+    purchase_price: float | None = None
     accumulated_km: int = 0
     installed_km: int | None = None
     installed_date: date | None = None
@@ -82,7 +83,7 @@ class FuelRecordDTO:
     fuel_date: date
     km_at_fuel: int
     liters: float
-    total_cost: int
+    total_cost: float
     consumption_l_per_100km: float | None = None
 
 
@@ -94,6 +95,6 @@ class RepairDTO:
     repair_date: date
     km_at_repair: int
     description: str | None
-    work_cost: int
-    parts_cost: int
+    work_cost: float
+    parts_cost: float
     component_types: list[ComponentType]
