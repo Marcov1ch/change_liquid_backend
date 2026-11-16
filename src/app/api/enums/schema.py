@@ -41,6 +41,7 @@ class ComponentConfigResponse(BaseModel):
     example: str
     default_interval: int
     default_interval_months: int | None = None
+    supports_volume: bool = True
 
 
 class ComponentConfigsResponse(BaseModel):

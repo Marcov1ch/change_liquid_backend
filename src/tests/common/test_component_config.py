@@ -70,3 +70,18 @@ def test_differential_components_order() -> None:
         'differential_oil_front',
         'transfer_case_oil',
     ]
+
+
+def test_volume_support_flags() -> None:
+    volume_types = {
+        'engine_oil',
+        'transmission_oil',
+        'brake_fluid',
+        'coolant',
+        'power_steering_fluid',
+        'differential_oil',
+        'differential_oil_front',
+        'transfer_case_oil',
+    }
+    for cfg in COMPONENTS_CONFIG:
+        assert cfg.supports_volume is (cfg.type.value in volume_types)

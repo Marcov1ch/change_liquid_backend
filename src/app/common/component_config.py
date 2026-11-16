@@ -12,6 +12,7 @@ class ComponentConfig:
     example: str
     default_interval: int
     default_interval_months: int | None = None
+    supports_volume: bool = True
 
 
 COMPONENTS_CONFIG = [
@@ -104,6 +105,7 @@ COMPONENTS_CONFIG = [
         'MANN CUK 2643',
         15000,
         12,
+        supports_volume=False,
     ),
     ComponentConfig(
         ComponentType.SPARK_PLUGS,
@@ -114,6 +116,7 @@ COMPONENTS_CONFIG = [
         'NGK BKR6E',
         45000,
         24,
+        supports_volume=False,
     ),
     ComponentConfig(
         ComponentType.AIR_FILTER,
@@ -124,6 +127,7 @@ COMPONENTS_CONFIG = [
         'MANN C 36106',
         10000,
         12,
+        supports_volume=False,
     ),
     ComponentConfig(
         ComponentType.FUEL_FILTER,
@@ -134,5 +138,6 @@ COMPONENTS_CONFIG = [
         'Bosch F026403850',
         50000,
         24,
+        supports_volume=False,
     ),
 ]

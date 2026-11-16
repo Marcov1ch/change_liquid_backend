@@ -53,6 +53,12 @@ router.add_api_route(
     tags=["vehicles"],
 )
 router.add_api_route(
+    "/vehicles/{vehicle_id}/reference",
+    vehicle_handler.update_reference,
+    methods=["PATCH"],
+    tags=["vehicles"],
+)
+router.add_api_route(
     "/vehicles/{vehicle_id}/intervals",
     vehicle_handler.update_vehicle_intervals,
     methods=["PATCH"],

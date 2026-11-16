@@ -144,6 +144,12 @@ class VehicleDB(Base):  # type: ignore
         back_populates="vehicle",
         cascade="all, delete-orphan",
     )
+    reference_items = relationship(
+        "VehicleReferenceDB",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+        order_by="VehicleReferenceDB.id",
+    )
 
 
 class TireSetDB(Base):  # type: ignore
@@ -195,9 +201,50 @@ class VehicleSizeDB(Base):  # type: ignore
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class VehicleReferenceDB(Base):  # type: ignore
+    """Справочные данные автомобиля по компоненту."""
+
+    __tablename__ = "vehicle_reference_items"
+    __table_args__ = (
+        UniqueConstraint('vehicle_id', 'component_type', name='uq_vehicle_reference_component'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True)
+    component_type = Column(String, nullable=False)
+    volume_liters = Column(Numeric(6, 2), nullable=True)
+    note = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    vehicle = relationship("VehicleDB", back_populates="reference_items")
+    variants = relationship(
+        "VehicleReferenceVariantDB",
+        back_populates="reference",
+        cascade="all, delete-orphan",
+        order_by="VehicleReferenceVariantDB.id",
+    )
+
+
+class VehicleReferenceVariantDB(Base):  # type: ignore
+    """Вариант (допуск/название) для справочных данных компонента."""
+
+    __tablename__ = "vehicle_reference_variants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reference_id = Column(
+        Integer,
+        ForeignKey("vehicle_reference_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(100), nullable=False)
+    approvals = Column(String(300), nullable=True)
+
+    reference = relationship("VehicleReferenceDB", back_populates="variants")
+
+
 class ReplacementDB(Base):  # type: ignore
     """Замена компонента (запись о выполненной замене)."""
-
     __tablename__ = "replacements"
 
     id = Column(Integer, primary_key=True, index=True)

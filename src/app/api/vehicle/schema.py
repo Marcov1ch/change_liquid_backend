@@ -1,8 +1,12 @@
 from datetime import date
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
+from app.common.component_config import COMPONENTS_CONFIG
 from app.common.schemas.base_vehicle import VehicleBase, normalize_plate_number
+
+_COMPONENT_KEYS = {cfg.type.value for cfg in COMPONENTS_CONFIG}
+_VOLUME_COMPONENT_KEYS = {cfg.type.value for cfg in COMPONENTS_CONFIG if cfg.supports_volume}
 
 
 class RimSize(BaseModel):
@@ -50,6 +54,71 @@ class UpdateVehicleSizes(BaseModel):
         default_factory=list,
         description='Список допустимых размеров шин',
     )
+
+
+class ReferenceVariant(BaseModel):
+    """Вариант компонента: название и допуски."""
+    name: str = Field(..., min_length=1, max_length=100)
+    approvals: str | None = Field(None, max_length=300)
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError('Название варианта не может быть пустым')
+        return stripped
+
+    @field_validator('approvals')
+    @classmethod
+    def validate_approvals(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
+class ReferenceItem(BaseModel):
+    """Справочные данные по одному компоненту автомобиля."""
+    component_type: str = Field(..., min_length=1, max_length=50)
+    volume_liters: float | None = Field(None, gt=0, le=100)
+    note: str | None = Field(None, max_length=500)
+    variants: list[ReferenceVariant] = Field(default_factory=list, max_length=20)
+
+    @field_validator('component_type')
+    @classmethod
+    def validate_component_type(cls, value: str) -> str:
+        if value not in _COMPONENT_KEYS:
+            raise ValueError('Неизвестный компонент')
+        return value
+
+    @field_validator('note')
+    @classmethod
+    def validate_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @model_validator(mode='after')
+    def validate_content(self) -> 'ReferenceItem':
+        if self.volume_liters is None and not self.variants:
+            raise ValueError('Укажите объём или хотя бы один вариант')
+        if self.volume_liters is not None and self.component_type not in _VOLUME_COMPONENT_KEYS:
+            raise ValueError('Для этого компонента объём не используется')
+        return self
+
+
+class UpdateVehicleReference(BaseModel):
+    """Полная замена справочных данных автомобиля."""
+    reference_items: list[ReferenceItem] = Field(..., max_length=50)
+
+    @model_validator(mode='after')
+    def validate_unique_components(self) -> 'UpdateVehicleReference':
+        component_types = [item.component_type for item in self.reference_items]
+        if len(component_types) != len(set(component_types)):
+            raise ValueError('Компонент не может повторяться')
+        return self
 
 
 class VehicleCreateRequest(VehicleBase):
@@ -108,6 +177,10 @@ class VehicleResponse(VehicleBase):
     tires: list[TireSize] = Field(
         default_factory=list,
         description='Список допустимых размеров шин',
+    )
+    reference_items: list[ReferenceItem] = Field(
+        default_factory=list,
+        description='Справочные объёмы и допуски по компонентам',
     )
 
 

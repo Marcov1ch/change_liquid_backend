@@ -98,6 +98,18 @@ km_remaining        = next_replacement_km - current_km
 - Интервал по пробегу влияет на статус (`good/warning/...`), интервал по месяцам — на `next_change_date` / `days_remaining`.
 - Интервалы хранятся у автомобиля (колонки `*_interval_km` / `*_interval_months`). Если значение не задано — подставляется дефолт из `COMPONENTS_CONFIG` (см. `VehicleRepository._intervals_and_flags`).
 - Флаги уведомлений также хранятся у автомобиля (`*_notify_enabled`, плюс `tire_notify_enabled`, `insurance_notify_enabled` и `parking_monthly_notify_enabled`) и переключаются через `PATCH /api/v1/vehicles/{id}/notify`.
+- `supports_volume` в `COMPONENTS_CONFIG` показывает, используется ли для компонента заправочный объём (жидкости — да, фильтры и свечи — нет). Флаг отдаётся в `GET /api/v1/enums/component-configs`.
+
+## Справочные объёмы и допуски
+
+Необязательные пользовательские данные «для себя», отдельно от замен и статистики.
+
+- `vehicle_reference_items` — одна запись на компонент автомобиля (`unique(vehicle_id, component_type)`); `component_type` из `COMPONENTS_CONFIG`.
+- `volume_liters` — заправочный объём, `numeric(6,2)`, только для компонентов с `supports_volume=true`.
+- `vehicle_reference_variants` — варианты под компонентом: `name` (например, `0W-20`, `5W-30`, артикул фильтра) и свободное поле `approvals` (допуски через запятую).
+- У компонентов без объёма (`cabin_filter`, `air_filter`, `fuel_filter`, `spark_plugs`) задаются только варианты с названием/допусками.
+- Полная замена: `PATCH /api/v1/vehicles/{id}/reference` с `reference_items`; поле `reference_items` есть в `VehicleResponse`.
+- В публичный профиль автомобиля справочные данные **не** попадают. Архивированный автомобиль менять нельзя (409).
 
 ## Комплекты шин
 

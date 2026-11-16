@@ -13,6 +13,7 @@ _EXPECTED_ROUTES: set[tuple[str, str, tuple[str, ...]]] = {
     ('/api/v1/vehicles/{vehicle_id}/restore', 'PATCH', ('vehicles',)),
     ('/api/v1/vehicles/{vehicle_id}/notify', 'PATCH', ('vehicles',)),
     ('/api/v1/vehicles/{vehicle_id}/sizes', 'PATCH', ('vehicles',)),
+    ('/api/v1/vehicles/{vehicle_id}/reference', 'PATCH', ('vehicles',)),
     ('/api/v1/vehicles/{vehicle_id}/intervals', 'PATCH', ('vehicles',)),
     ('/api/v1/vehicles/{vehicle_id}', 'DELETE', ('vehicles',)),
     ('/api/v1/vehicles/{vehicle_id}/hard', 'DELETE', ('vehicles',)),

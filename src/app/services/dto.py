@@ -24,6 +24,7 @@ class VehicleDTO:
     interval_months: dict[str, int | None] = field(default_factory=dict)
     rims: list[dict[str, int | float | None]] = field(default_factory=list)
     tires: list[dict[str, str | None]] = field(default_factory=list)
+    reference_items: list[dict[str, object]] = field(default_factory=list)
 
 
 @dataclass
