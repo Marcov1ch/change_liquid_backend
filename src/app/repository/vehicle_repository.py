@@ -56,6 +56,18 @@ class VehicleRepository:
                     'label': size.label,
                 })
 
+        reference_items: list[dict[str, object]] = []
+        for item in db_vehicle.reference_items:
+            reference_items.append({
+                'component_type': item.component_type,
+                'volume_liters': float(item.volume_liters) if item.volume_liters is not None else None,
+                'note': item.note,
+                'variants': [
+                    {'name': variant.name, 'approvals': variant.approvals}
+                    for variant in item.variants
+                ],
+            })
+
         return VehicleDTO(
             id=db_vehicle.id,
             brand=db_vehicle.brand_ref.name,
@@ -74,6 +86,7 @@ class VehicleRepository:
             interval_months=interval_months,
             rims=rims,
             tires=tires,
+            reference_items=reference_items,
         )
 
     def _apply_intervals(self, db_vehicle: VehicleDB, dto: VehicleDTO) -> None:
@@ -220,6 +233,35 @@ class VehicleRepository:
                 size=t.get('size'),
                 label=t.get('label'),
             ))
+
+        self.db.commit()
+        self.db.refresh(db_vehicle)
+        return self._to_dto(db_vehicle)
+
+    def replace_reference(self, vehicle_id: int, items: list[dict]) -> VehicleDTO | None:
+        """Полная замена справочных объёмов и допусков."""
+        from app.db.models import VehicleReferenceDB, VehicleReferenceVariantDB
+
+        db_vehicle = self.db.query(VehicleDB).filter(VehicleDB.id == vehicle_id).first()
+        if not db_vehicle:
+            return None
+
+        db_vehicle.reference_items.clear()
+        self.db.flush()
+
+        for item in items:
+            reference = VehicleReferenceDB(
+                vehicle_id=vehicle_id,
+                component_type=item.get('component_type'),
+                volume_liters=item.get('volume_liters'),
+                note=item.get('note'),
+            )
+            for variant in item.get('variants', []):
+                reference.variants.append(VehicleReferenceVariantDB(
+                    name=variant.get('name'),
+                    approvals=variant.get('approvals'),
+                ))
+            db_vehicle.reference_items.append(reference)
 
         self.db.commit()
         self.db.refresh(db_vehicle)

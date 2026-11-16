@@ -12,6 +12,7 @@ from app.api.vehicle.schema import (
     VehicleUpdateIntervals,
     UpdateVehicleNotify,
     UpdateVehicleSizes,
+    UpdateVehicleReference,
 )
 from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
@@ -58,6 +59,7 @@ class VehicleHandler:
             vehicle_status=vehicle_status_value,
             rims=[dict(r) for r in vehicle_dto.rims],
             tires=[dict(t) for t in vehicle_dto.tires],
+            reference_items=[dict(item) for item in vehicle_dto.reference_items],
         )
 
     def _calc_remaining(
@@ -328,6 +330,33 @@ class VehicleHandler:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail='Не удалось обновить размеры дисков и шин',
+            )
+
+    async def update_reference(
+        self,
+        request: UpdateVehicleReference,
+        db: Session = Depends(get_db),
+        vehicle: VehicleDTO = Depends(verify_vehicle_access),
+    ) -> VehicleResponse:
+        """Обновить справочные объёмы и допуски по компонентам."""
+        vehicle_service = VehicleService(db)
+        try:
+            items = [item.model_dump() for item in request.reference_items]
+            updated_dto = vehicle_service.repository.replace_reference(vehicle.id, items)
+            if updated_dto is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail='Автомобиль не найден',
+                )
+
+            return self._to_response(updated_dto)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception('Failed to update vehicle reference items')
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail='Не удалось обновить справочные данные',
             )
 
     async def delete_vehicle(
