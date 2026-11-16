@@ -18,7 +18,7 @@ from app.common.enums import StatusEnum
 from app.common.component_config import COMPONENTS_CONFIG
 from app.common.middleware import verify_vehicle_access, verify_vehicle_view_access
 from app.db.database import get_db
-from app.db.models import UserDB
+from app.db.models import UserDB, VehicleDB
 from app.auth.jwt import get_current_user
 from app.services.replacement_service import ReplacementService
 from app.services.other_expense_service import OtherExpenseService
@@ -156,6 +156,9 @@ class VehicleHandler:
         vehicle_service = VehicleService(db)
         try:
             vehicle_dto = vehicle_service.create(current_user.id, request)
+            if current_user.primary_vehicle_id is None and vehicle_dto.id is not None:
+                current_user.primary_vehicle_id = vehicle_dto.id
+                db.commit()
 
             return self._to_response(vehicle_dto)
         except ValueError as err:
@@ -171,6 +174,24 @@ class VehicleHandler:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail='Не удалось создать автомобиль',
             )
+
+    @staticmethod
+    def _promote_primary(db: Session, owner_id: int, exclude_id: int | None = None) -> None:
+        """Назначить основную машину, если текущая удалена или отсутствует."""
+        user = db.query(UserDB).filter(UserDB.id == owner_id).first()
+        if not user:
+            return
+        if user.primary_vehicle_id is not None and user.primary_vehicle_id != exclude_id:
+            return
+
+        query = db.query(VehicleDB).filter(
+            VehicleDB.owner_id == owner_id,
+            VehicleDB.is_active.is_(True),
+        )
+        if exclude_id is not None:
+            query = query.filter(VehicleDB.id != exclude_id)
+        candidate = query.order_by(VehicleDB.id.asc()).first()
+        user.primary_vehicle_id = candidate.id if candidate else None
 
     @staticmethod
     def _changed_fields(request: BaseModel) -> dict:
@@ -368,6 +389,8 @@ class VehicleHandler:
         vehicle_service = VehicleService(db)
         try:
             vehicle_service.delete(vehicle.id)
+            self._promote_primary(db, vehicle.owner_id, exclude_id=vehicle.id)
+            db.commit()
             return {
                 'status': 'ok',
                 'message': f'Автомобиль {vehicle.id} успешно удален',
@@ -400,6 +423,7 @@ class VehicleHandler:
             other_expense_service.delete_by_vehicle(vehicle.id, commit=False)
             fuel_record_service.delete_by_vehicle(vehicle.id, commit=False)
             tire_set_service.delete_by_vehicle(vehicle.id, commit=False)
+            self._promote_primary(db, vehicle.owner_id, exclude_id=vehicle.id)
             vehicle_service.hard_delete(vehicle.id, commit=False)
             db.commit()
 
@@ -433,6 +457,10 @@ class VehicleHandler:
                 )
             vehicle.is_active = True
             updated_dto = vehicle_service.update(vehicle)
+            user = db.query(UserDB).filter(UserDB.id == vehicle.owner_id).first()
+            if user and user.primary_vehicle_id is None:
+                user.primary_vehicle_id = vehicle.id
+                db.commit()
             return self._to_response(updated_dto)
         except HTTPException:
             raise

@@ -54,6 +54,7 @@ class UserDB(Base):  # type: ignore
     token_version = Column(Integer, nullable=False, server_default="0", default=0)
     currency = Column(String(3), nullable=False, default="RUB", server_default="RUB")
     profile_visited = Column(Boolean, nullable=False, default=False, server_default="0")
+    primary_vehicle_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     vehicles = relationship("VehicleDB", back_populates="owner")
