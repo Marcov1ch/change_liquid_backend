@@ -32,6 +32,7 @@ class UserResponse(BaseModel):
     is_active: bool
     currency: str
     profile_visited: bool
+    primary_vehicle_id: int | None = None
     created_at: datetime
 
 
@@ -107,3 +108,8 @@ class ResetPasswordRequest(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     token: str
+
+
+class UpdatePrimaryVehicleRequest(BaseModel):
+    """Выбор основной машины пользователя."""
+    vehicle_id: int | None = None

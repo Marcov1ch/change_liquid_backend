@@ -12,6 +12,7 @@ from app.auth.schemas import (
     MessageResponse,
     UpdateCurrencyRequest,
     UpdateEmailRequest,
+    UpdatePrimaryVehicleRequest,
     UserResponse,
 )
 from app.auth.user_service import (
@@ -20,7 +21,7 @@ from app.auth.user_service import (
     user_to_response,
 )
 from app.db.database import get_db
-from app.db.models import UserDB
+from app.db.models import UserDB, VehicleDB
 from app.services.currency_conversion_service import CurrencyConversionService
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,36 @@ router = APIRouter()
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: UserDB = Depends(get_current_user)) -> UserResponse:
     """Получить информацию о текущем пользователе."""
+    return user_to_response(current_user)
+
+
+@router.patch("/primary-vehicle", response_model=UserResponse)
+def update_primary_vehicle(
+    request: UpdatePrimaryVehicleRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+) -> UserResponse:
+    """Назначить основную машину пользователя."""
+    if request.vehicle_id is None:
+        current_user.primary_vehicle_id = None
+        db.commit()
+        db.refresh(current_user)
+        return user_to_response(current_user)
+
+    vehicle = db.query(VehicleDB).filter(
+        VehicleDB.id == request.vehicle_id,
+        VehicleDB.owner_id == current_user.id,
+        VehicleDB.is_active.is_(True),
+    ).first()
+    if not vehicle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Автомобиль не найден",
+        )
+
+    current_user.primary_vehicle_id = vehicle.id
+    db.commit()
+    db.refresh(current_user)
     return user_to_response(current_user)
 
 
