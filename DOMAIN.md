@@ -80,7 +80,9 @@ km_remaining        = next_replacement_km - current_km
 | `brake_fluid` | Тормозная жидкость | 40000 | 24 |
 | `coolant` | Антифриз | 60000 | 24 |
 | `power_steering_fluid` | Жидкость ГУР | 40000 | 60 |
-| `differential_oil` | Масло в редукторе | 50000 | 60 |
+| `differential_oil` | Масло в редукторе (зад) | 50000 | 60 |
+| `differential_oil_front` | Масло в редукторе (перед) | 50000 | 60 |
+| `transfer_case_oil` | Масло в раздатке | 50000 | 60 |
 | `cabin_filter` | Фильтр салона | 15000 | 12 |
 | `spark_plugs` | Свечи зажигания | 45000 | 24 |
 | `air_filter` | Воздушный фильтр | 10000 | 12 |

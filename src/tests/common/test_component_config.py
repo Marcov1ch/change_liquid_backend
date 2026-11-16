@@ -42,3 +42,31 @@ def test_fuel_filter_config() -> None:
     assert cfg.name_genitive == 'топливного фильтра'
     assert cfg.default_interval == 50000
     assert cfg.default_interval_months == 24
+
+
+def test_differential_components_config() -> None:
+    rear = next(c for c in COMPONENTS_CONFIG if c.type == ComponentType.DIFFERENTIAL_OIL)
+    front = next(c for c in COMPONENTS_CONFIG if c.type == ComponentType.DIFFERENTIAL_OIL_FRONT)
+    transfer = next(c for c in COMPONENTS_CONFIG if c.type == ComponentType.TRANSFER_CASE_OIL)
+
+    assert rear.name == 'Масло в редукторе (зад)'
+    assert rear.name_genitive == 'масла в редукторе (зад)'
+    assert front.name == 'Масло в редукторе (перед)'
+    assert front.name_genitive == 'масла в редукторе (перед)'
+    assert transfer.name == 'Масло в раздатке'
+    assert transfer.name_genitive == 'масла в раздатке'
+
+    for cfg in (front, transfer):
+        assert cfg.default_interval == rear.default_interval
+        assert cfg.default_interval_months == rear.default_interval_months
+        assert cfg.example == rear.example
+
+
+def test_differential_components_order() -> None:
+    keys = [cfg.type.value for cfg in COMPONENTS_CONFIG]
+    index = keys.index('differential_oil')
+    assert keys[index:index + 3] == [
+        'differential_oil',
+        'differential_oil_front',
+        'transfer_case_oil',
+    ]

@@ -9,6 +9,8 @@ class ComponentType(Enum):
     BRAKE_FLUID = "brake_fluid"
     POWER_STEERING_FLUID = "power_steering_fluid"
     DIFFERENTIAL_OIL = "differential_oil"
+    DIFFERENTIAL_OIL_FRONT = "differential_oil_front"
+    TRANSFER_CASE_OIL = "transfer_case_oil"
     CABIN_FILTER = "cabin_filter"
     SPARK_PLUGS = "spark_plugs"
     AIR_FILTER = "air_filter"
