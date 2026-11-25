@@ -8,6 +8,7 @@ from app.api.fuel_record.schema import (
     FuelRecordResponse,
     FuelRecordUpdateRequest,
 )
+from app.common.enums import Currency
 from app.common.middleware import (
     verify_fuel_record_access,
     verify_fuel_record_view_access,
@@ -15,6 +16,10 @@ from app.common.middleware import (
     verify_vehicle_view_access,
 )
 from app.db.database import get_db
+from app.services.currency_conversion_service import (
+    CurrencyConversionService,
+    CurrencyRateError,
+)
 from app.services.dto import FuelRecordDTO, VehicleDTO
 from app.services.fuel_record_service import FuelRecordService
 
@@ -37,7 +42,7 @@ class FuelRecordHandler:
             consumption_l_per_100km=record.consumption_l_per_100km,
         )
 
-    async def create_fuel_record(
+    def create_fuel_record(
         self,
         request: FuelRecordCreateRequest,
         db: Session = Depends(get_db),
@@ -47,8 +52,28 @@ class FuelRecordHandler:
         fuel_service = FuelRecordService(db)
 
         try:
+            target_currency = vehicle.owner_currency or Currency.RUB.value
+            source_currency = (
+                request.currency.value
+                if request.currency is not None
+                else target_currency
+            )
+            if source_currency != target_currency:
+                converted = CurrencyConversionService(db).convert_for_owner(
+                    [request.total_cost],
+                    request.currency,
+                    target_currency,
+                )
+                request = request.model_copy(update={'total_cost': converted[0]})
+
             record = fuel_service.create(vehicle.id, request, vehicle)  # type: ignore[arg-type]
             return self._to_response(record)
+        except CurrencyRateError as err:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(err),
+            )
         except ValueError as err:
             db.rollback()
             raise HTTPException(

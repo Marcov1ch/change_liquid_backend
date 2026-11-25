@@ -8,6 +8,7 @@ from app.api.other_expense.schema import (
     OtherExpenseUpdateRequest,
     OtherExpenseCreateRequest,
 )
+from app.common.enums import Currency
 from app.common.middleware import (
     verify_vehicle_access,
     verify_vehicle_view_access,
@@ -15,6 +16,10 @@ from app.common.middleware import (
     verify_other_expense_view_access,
 )
 from app.db.database import get_db
+from app.services.currency_conversion_service import (
+    CurrencyConversionService,
+    CurrencyRateError,
+)
 from app.services.dto import VehicleDTO, OtherExpenseDTO
 from app.services.other_expense_service import OtherExpenseService
 
@@ -35,7 +40,7 @@ class OtherExpenseHandler:
             amount=expense.amount,
         )
 
-    async def create_other_expense(
+    def create_other_expense(
         self,
         request: OtherExpenseCreateRequest,
         db: Session = Depends(get_db),
@@ -45,8 +50,28 @@ class OtherExpenseHandler:
         expense_service = OtherExpenseService(db)
 
         try:
+            target_currency = vehicle.owner_currency or Currency.RUB.value
+            source_currency = (
+                request.currency.value
+                if request.currency is not None
+                else target_currency
+            )
+            if source_currency != target_currency:
+                converted = CurrencyConversionService(db).convert_for_owner(
+                    [request.amount],
+                    request.currency,
+                    target_currency,
+                )
+                request = request.model_copy(update={'amount': converted[0]})
+
             expense = expense_service.create(vehicle.id, request)
             return self._to_response(expense)
+        except CurrencyRateError as err:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(err),
+            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -12,7 +12,18 @@ from app.api.fuel_record.schema import (
     FuelRecordResponse,
     FuelRecordUpdateRequest,
 )
+from app.common.enums import Currency
+from app.services.currency_service import RatesSnapshot, rate_service
 from app.services.dto import FuelRecordDTO, VehicleDTO
+
+
+def _rates_snapshot(rates: dict[str, float] | None = None) -> RatesSnapshot:
+    return RatesSnapshot(
+        rates=rates or {'RUB': 1.0, 'USD': 100.0, 'BYN': 30.0, 'EUR': 120.0},
+        source='test',
+        fetched_at=None,
+        stale=False,
+    )
 
 
 def _vehicle() -> VehicleDTO:
@@ -50,12 +61,10 @@ def test_create_fuel_record_returns_response() -> None:
     with patch('app.api.fuel_record.handler.FuelRecordService') as service_cls:
         service_cls.return_value.create.return_value = _record()
 
-        response = asyncio.run(
-            FuelRecordHandler().create_fuel_record(
-                request=request,
-                db=db,
-                vehicle=_vehicle(),
-            )
+        response = FuelRecordHandler().create_fuel_record(
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
         )
 
     assert isinstance(response, FuelRecordResponse)
@@ -71,16 +80,69 @@ def test_create_fuel_record_maps_value_error_to_400() -> None:
         service_cls.return_value.create.side_effect = ValueError('Некорректная заправка')
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(
-                FuelRecordHandler().create_fuel_record(
-                    request=_create_request(),
-                    db=db,
-                    vehicle=_vehicle(),
-                )
+            FuelRecordHandler().create_fuel_record(
+                request=_create_request(),
+                db=db,
+                vehicle=_vehicle(),
             )
 
     assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
     assert exc.value.detail == 'Некорректная заправка'
+    db.rollback.assert_called_once()
+
+
+def test_create_fuel_record_converts_foreign_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = FuelRecordCreateRequest(
+        fuel_date=date(2026, 1, 15),
+        km_at_fuel=15000,
+        liters=35.5,
+        total_cost=10.0,
+        currency=Currency.EUR,
+    )
+    monkeypatch.setattr(rate_service, 'get_rates', lambda: _rates_snapshot())
+
+    with patch('app.api.fuel_record.handler.FuelRecordService') as service_cls:
+        service_cls.return_value.create.return_value = _record()
+        FuelRecordHandler().create_fuel_record(
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
+        )
+
+    passed_request = service_cls.return_value.create.call_args[0][1]
+    assert passed_request.total_cost == 1200.0
+
+
+def test_create_fuel_record_maps_currency_rate_error_to_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = FuelRecordCreateRequest(
+        fuel_date=date(2026, 1, 15),
+        km_at_fuel=15000,
+        liters=35.5,
+        total_cost=10.0,
+        currency=Currency.EUR,
+    )
+    monkeypatch.setattr(
+        rate_service,
+        'get_rates',
+        lambda: _rates_snapshot({'RUB': 1.0}),
+    )
+
+    with patch('app.api.fuel_record.handler.FuelRecordService') as service_cls:
+        with pytest.raises(HTTPException) as exc:
+            FuelRecordHandler().create_fuel_record(
+                request=request,
+                db=db,
+                vehicle=_vehicle(),
+            )
+
+    assert exc.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    service_cls.return_value.create.assert_not_called()
     db.rollback.assert_called_once()
 
 

@@ -14,8 +14,18 @@ from app.api.tire_set.schema import (
     TireSetResponse,
     TireSetUpdateRequest,
 )
-from app.common.enums import ComponentType, TireSeason
+from app.common.enums import ComponentType, Currency, TireSeason
+from app.services.currency_service import RatesSnapshot, rate_service
 from app.services.dto import ReplacementDTO, TireSetDTO, VehicleDTO
+
+
+def _rates_snapshot() -> RatesSnapshot:
+    return RatesSnapshot(
+        rates={'RUB': 1.0, 'USD': 100.0, 'BYN': 30.0, 'EUR': 120.0},
+        source='test',
+        fetched_at=None,
+        stale=False,
+    )
 
 
 def _vehicle() -> VehicleDTO:
@@ -93,12 +103,10 @@ def test_create_tire_set_returns_response() -> None:
     with patch('app.api.tire_set.handler.TireSetService') as service_cls:
         service_cls.return_value.create.return_value = _tire_set()
 
-        response = asyncio.run(
-            TireSetHandler().create_tire_set(
-                request=request,
-                db=db,
-                vehicle=_vehicle(),
-            )
+        response = TireSetHandler().create_tire_set(
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
         )
 
     assert isinstance(response, TireSetResponse)
@@ -114,16 +122,38 @@ def test_create_tire_set_maps_value_error_to_400() -> None:
         service_cls.return_value.create.side_effect = ValueError('Некорректный комплект')
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(
-                TireSetHandler().create_tire_set(
-                    request=_create_request(),
-                    db=db,
-                    vehicle=_vehicle(),
-                )
+            TireSetHandler().create_tire_set(
+                request=_create_request(),
+                db=db,
+                vehicle=_vehicle(),
             )
 
     assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
     assert exc.value.detail == 'Некорректный комплект'
+
+
+def test_create_tire_set_converts_foreign_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = TireSetCreateRequest(
+        name='Зимние Michelin',
+        season='winter',
+        purchase_date=date(2026, 10, 17),
+        purchase_price=100.0,
+        install_now=True,
+        work_price=10.0,
+        currency=Currency.EUR,
+    )
+    monkeypatch.setattr(rate_service, 'get_rates', _rates_snapshot)
+
+    with patch('app.api.tire_set.handler.TireSetService') as service_cls:
+        service_cls.return_value.create.return_value = _tire_set()
+        TireSetHandler().create_tire_set(request=request, db=db, vehicle=_vehicle())
+
+    passed_request = service_cls.return_value.create.call_args[0][1]
+    assert passed_request.purchase_price == 12000.0
+    assert passed_request.work_price == 1200.0
 
 
 def test_update_tire_set_returns_response() -> None:
@@ -200,13 +230,11 @@ def test_install_tire_set_returns_response() -> None:
             _replacement(),
         )
 
-        response = asyncio.run(
-            TireSetHandler().install_tire_set(
-                tire_set_id=1,
-                request=request,
-                db=db,
-                vehicle=_vehicle(),
-            )
+        response = TireSetHandler().install_tire_set(
+            tire_set_id=1,
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
         )
 
     assert isinstance(response, TireInstallResponse)
@@ -227,14 +255,32 @@ def test_install_tire_set_maps_value_error_to_400() -> None:
         )
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(
-                TireSetHandler().install_tire_set(
-                    tire_set_id=1,
-                    request=TireInstallRequest(),
-                    db=db,
-                    vehicle=_vehicle(),
-                )
+            TireSetHandler().install_tire_set(
+                tire_set_id=1,
+                request=TireInstallRequest(),
+                db=db,
+                vehicle=_vehicle(),
             )
 
     assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
     assert exc.value.detail == 'Этот комплект шин уже установлен'
+
+
+def test_install_tire_set_converts_foreign_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = TireInstallRequest(work_price=10.0, currency=Currency.EUR)
+    monkeypatch.setattr(rate_service, 'get_rates', _rates_snapshot)
+
+    with patch('app.api.tire_set.handler.TireSetService') as service_cls:
+        service_cls.return_value.install.return_value = (_tire_set(), _replacement())
+        TireSetHandler().install_tire_set(
+            tire_set_id=1,
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
+        )
+
+    passed_request = service_cls.return_value.install.call_args[0][2]
+    assert passed_request.work_price == 1200.0

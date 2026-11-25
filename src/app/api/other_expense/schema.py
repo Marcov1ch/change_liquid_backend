@@ -1,6 +1,8 @@
 from datetime import date
 from pydantic import BaseModel, Field
 
+from app.common.enums import Currency
+
 
 class OtherExpenseCreateRequest(BaseModel):
     """Запрос на создание прочей траты."""
@@ -21,6 +23,11 @@ class OtherExpenseCreateRequest(BaseModel):
         description='Стоимость траты в валюте пользователя',
         examples=[500.0],
         gt=0,
+    )
+    currency: Currency | None = Field(
+        None,
+        description='Валюта ввода; по умолчанию — валюта профиля',
+        examples=[Currency.EUR.value],
     )
 
 

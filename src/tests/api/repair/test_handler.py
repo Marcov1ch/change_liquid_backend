@@ -12,8 +12,18 @@ from app.api.repair.schema import (
     RepairResponse,
     RepairUpdateRequest,
 )
-from app.common.enums import ComponentType
+from app.common.enums import ComponentType, Currency
+from app.services.currency_service import RatesSnapshot, rate_service
 from app.services.dto import RepairDTO, VehicleDTO
+
+
+def _rates_snapshot() -> RatesSnapshot:
+    return RatesSnapshot(
+        rates={'RUB': 1.0, 'USD': 100.0, 'BYN': 30.0, 'EUR': 120.0},
+        source='test',
+        fetched_at=None,
+        stale=False,
+    )
 
 
 def _vehicle() -> VehicleDTO:
@@ -65,8 +75,10 @@ def test_create_repair_returns_response() -> None:
     with patch('app.api.repair.handler.RepairService') as service_cls:
         service_cls.return_value.create.return_value = _repair()
 
-        response = asyncio.run(
-            RepairHandler().create_repair(request=request, db=db, vehicle=_vehicle())
+        response = RepairHandler().create_repair(
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
         )
 
     assert isinstance(response, RepairResponse)
@@ -82,12 +94,10 @@ def test_create_repair_maps_value_error_to_400() -> None:
         service_cls.return_value.create.side_effect = ValueError('Дата ремонта в будущем')
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(
-                RepairHandler().create_repair(
-                    request=_create_request(),
-                    db=db,
-                    vehicle=_vehicle(),
-                )
+            RepairHandler().create_repair(
+                request=_create_request(),
+                db=db,
+                vehicle=_vehicle(),
             )
 
     assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -101,17 +111,39 @@ def test_create_repair_maps_unexpected_error_to_500() -> None:
         service_cls.return_value.create.side_effect = RuntimeError('boom')
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(
-                RepairHandler().create_repair(
-                    request=_create_request(),
-                    db=db,
-                    vehicle=_vehicle(),
-                )
+            RepairHandler().create_repair(
+                request=_create_request(),
+                db=db,
+                vehicle=_vehicle(),
             )
 
     assert exc.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert exc.value.detail == 'Не удалось создать ремонт'
     db.rollback.assert_called_once()
+
+
+def test_create_repair_converts_foreign_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = RepairCreateRequest(
+        repair_date=date(2026, 1, 15),
+        km_at_repair=15000,
+        description='Плановое ТО',
+        work_cost=10.0,
+        parts_cost=20.0,
+        component_types=[ComponentType.ENGINE_OIL],
+        currency=Currency.EUR,
+    )
+    monkeypatch.setattr(rate_service, 'get_rates', _rates_snapshot)
+
+    with patch('app.api.repair.handler.RepairService') as service_cls:
+        service_cls.return_value.create.return_value = _repair()
+        RepairHandler().create_repair(request=request, db=db, vehicle=_vehicle())
+
+    passed_request = service_cls.return_value.create.call_args[0][1]
+    assert passed_request.work_cost == 1200.0
+    assert passed_request.parts_cost == 2400.0
 
 
 def test_get_vehicle_repairs_returns_responses() -> None:
