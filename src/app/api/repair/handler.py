@@ -8,6 +8,7 @@ from app.api.repair.schema import (
     RepairResponse,
     RepairUpdateRequest,
 )
+from app.common.enums import Currency
 from app.common.middleware import (
     verify_repair_access,
     verify_repair_view_access,
@@ -15,6 +16,10 @@ from app.common.middleware import (
     verify_vehicle_view_access,
 )
 from app.db.database import get_db
+from app.services.currency_conversion_service import (
+    CurrencyConversionService,
+    CurrencyRateError,
+)
 from app.services.dto import RepairDTO, VehicleDTO
 from app.services.repair_service import RepairService
 
@@ -38,7 +43,7 @@ class RepairHandler:
             component_types=repair.component_types,
         )
 
-    async def create_repair(
+    def create_repair(
         self,
         request: RepairCreateRequest,
         db: Session = Depends(get_db),
@@ -48,8 +53,32 @@ class RepairHandler:
         repair_service = RepairService(db)
 
         try:
+            target_currency = vehicle.owner_currency or Currency.RUB.value
+            source_currency = (
+                request.currency.value
+                if request.currency is not None
+                else target_currency
+            )
+            if source_currency != target_currency:
+                work_cost, parts_cost = CurrencyConversionService(
+                    db,
+                ).convert_for_owner(
+                    [request.work_cost, request.parts_cost],
+                    request.currency,
+                    target_currency,
+                )
+                request = request.model_copy(
+                    update={'work_cost': work_cost, 'parts_cost': parts_cost},
+                )
+
             repair = repair_service.create(vehicle.id, request, vehicle)  # type: ignore[arg-type]
             return self._to_response(repair)
+        except CurrencyRateError as err:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(err),
+            )
         except ValueError as err:
             db.rollback()
             raise HTTPException(

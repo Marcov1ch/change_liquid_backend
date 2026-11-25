@@ -13,7 +13,18 @@ from app.api.other_expense.schema import (
     OtherExpenseResponse,
     OtherExpenseUpdateRequest,
 )
+from app.common.enums import Currency
+from app.services.currency_service import RatesSnapshot, rate_service
 from app.services.dto import OtherExpenseDTO, VehicleDTO
+
+
+def _rates_snapshot() -> RatesSnapshot:
+    return RatesSnapshot(
+        rates={'RUB': 1.0, 'USD': 100.0, 'BYN': 30.0, 'EUR': 120.0},
+        source='test',
+        fetched_at=None,
+        stale=False,
+    )
 
 
 def _vehicle(is_active: bool = True) -> VehicleDTO:
@@ -39,16 +50,14 @@ def test_create_other_expense_returns_response() -> None:
     with patch('app.api.other_expense.handler.OtherExpenseService') as service_cls:
         service_cls.return_value.create.return_value = _expense()
 
-        response = asyncio.run(
-            OtherExpenseHandler().create_other_expense(
-                request=OtherExpenseCreateRequest(
-                    name='Штраф',
-                    expense_date=date(2026, 1, 15),
-                    amount=500,
-                ),
-                db=db,
-                vehicle=_vehicle(),
-            )
+        response = OtherExpenseHandler().create_other_expense(
+            request=OtherExpenseCreateRequest(
+                name='Штраф',
+                expense_date=date(2026, 1, 15),
+                amount=500,
+            ),
+            db=db,
+            vehicle=_vehicle(),
         )
 
     assert isinstance(response, OtherExpenseResponse)
@@ -61,21 +70,48 @@ def test_create_other_expense_returns_response() -> None:
 
 def test_create_maps_validation_error_to_400() -> None:
     db = MagicMock()
-    request = SimpleNamespace(name='Штраф', expense_date=date(2026, 1, 15), amount=0)
+    request = SimpleNamespace(
+        name='Штраф',
+        expense_date=date(2026, 1, 15),
+        amount=0,
+        currency=None,
+    )
     with patch('app.api.other_expense.handler.OtherExpenseService') as service_cls:
         service_cls.return_value.create.side_effect = ValueError('Стоимость траты должна быть больше 0')
 
         with pytest.raises(HTTPException) as exc:
-            asyncio.run(
-                OtherExpenseHandler().create_other_expense(
-                    request=request,
-                    db=db,
-                    vehicle=_vehicle(),
-                )
+            OtherExpenseHandler().create_other_expense(
+                request=request,
+                db=db,
+                vehicle=_vehicle(),
             )
 
     assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
     assert exc.value.detail == 'Стоимость траты должна быть больше 0'
+
+
+def test_create_other_expense_converts_foreign_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = OtherExpenseCreateRequest(
+        name='Штраф',
+        expense_date=date(2026, 1, 15),
+        amount=1.0,
+        currency=Currency.EUR,
+    )
+    monkeypatch.setattr(rate_service, 'get_rates', _rates_snapshot)
+
+    with patch('app.api.other_expense.handler.OtherExpenseService') as service_cls:
+        service_cls.return_value.create.return_value = _expense()
+        OtherExpenseHandler().create_other_expense(
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
+        )
+
+    passed_request = service_cls.return_value.create.call_args[0][1]
+    assert passed_request.amount == 120.0
 
 
 def test_get_vehicle_other_expenses_returns_responses() -> None:

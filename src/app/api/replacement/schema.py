@@ -2,7 +2,7 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 from app.common.schemas.base_replacement import ReplacementBase
-from app.common.enums import StatusEnum
+from app.common.enums import Currency, StatusEnum
 
 
 class ReplacementCreateRequest(ReplacementBase):
@@ -115,4 +115,9 @@ class ReplacementsBulkRequest(BaseModel):
         description='Список замен',
         min_length=1,
         max_length=10,
+    )
+    currency: Currency | None = Field(
+        None,
+        description='Валюта ввода для всего пакета; по умолчанию — валюта профиля',
+        examples=[Currency.EUR.value],
     )

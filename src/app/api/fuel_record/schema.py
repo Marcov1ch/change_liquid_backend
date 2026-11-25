@@ -2,6 +2,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field
 
+from app.common.enums import Currency
+
 
 class FuelRecordCreateRequest(BaseModel):
     """Запрос на создание заправки."""
@@ -27,6 +29,11 @@ class FuelRecordCreateRequest(BaseModel):
         description='Стоимость заправки в валюте пользователя',
         ge=0,
         examples=[2500.0],
+    )
+    currency: Currency | None = Field(
+        None,
+        description='Валюта ввода; по умолчанию — валюта профиля',
+        examples=[Currency.EUR.value],
     )
 
 

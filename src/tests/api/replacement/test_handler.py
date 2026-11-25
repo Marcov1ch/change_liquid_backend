@@ -1,8 +1,25 @@
 from datetime import date, timedelta
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.api.replacement.handler import ReplacementHandler
-from app.common.enums import ComponentType, StatusEnum, TireEventType
+from app.api.replacement.schema import (
+    ReplacementCreateRequest,
+    ReplacementsBulkRequest,
+)
+from app.common.enums import ComponentType, Currency, StatusEnum, TireEventType
+from app.services.currency_service import RatesSnapshot, rate_service
 from app.services.dto import ReplacementDTO, VehicleDTO
+
+
+def _rates_snapshot() -> RatesSnapshot:
+    return RatesSnapshot(
+        rates={'RUB': 1.0, 'USD': 100.0, 'BYN': 30.0, 'EUR': 120.0},
+        source='test',
+        fetched_at=None,
+        stale=False,
+    )
 
 
 def _vehicle(interval_months: dict | None = None) -> VehicleDTO:
@@ -174,3 +191,36 @@ def test_tire_purchase_has_unknown_status_and_no_mileage() -> None:
     assert response.km_remaining is None
     assert response.tire_set_id == 7
     assert response.tire_event_type == TireEventType.PURCHASE.value
+
+
+def test_create_replacements_converts_bulk_currency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = MagicMock()
+    request = ReplacementsBulkRequest(
+        replacements=[
+            ReplacementCreateRequest(
+                component_type=ComponentType.ENGINE_OIL,
+                component_name='Mobil 1',
+                component_price=10.0,
+                work_price=5.0,
+                replacement_date=date(2026, 1, 15),
+                km_at_replacement=15000,
+            ),
+        ],
+        currency=Currency.EUR,
+    )
+    monkeypatch.setattr(rate_service, 'get_rates', _rates_snapshot)
+
+    with patch('app.api.replacement.handler.ReplacementService') as service_cls:
+        service_cls.return_value.create.return_value = _replacement()
+        service_cls.return_value.get_tire_km_traveled.return_value = {}
+        ReplacementHandler().create_replacements(
+            request=request,
+            db=db,
+            vehicle=_vehicle(),
+        )
+
+    passed_item = service_cls.return_value.create.call_args[0][1]
+    assert passed_item.component_price == 1200.0
+    assert passed_item.work_price == 600.0

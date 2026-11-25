@@ -23,6 +23,10 @@ _QUANT = Decimal("0.01")
 _conversion_lock = threading.Lock()
 
 
+class CurrencyRateError(ValueError):
+    """Не удалось получить курс для конвертации."""
+
+
 @dataclass(frozen=True)
 class ConversionPreview:
     """Данные для подтверждения смены валюты."""
@@ -73,6 +77,40 @@ class CurrencyConversionService:
     ) -> None:
         self.db = db
         self.rates = rates or rate_service
+
+    def convert_amounts(
+        self,
+        values: list[float | None],
+        source: str,
+        target: str,
+    ) -> list[float | None]:
+        """Пересчитать суммы из source в target по текущему курсу."""
+        if source == target:
+            return list(values)
+
+        snapshot = self.rates.get_rates()
+        rate_from = snapshot.rates.get(source)
+        rate_to = snapshot.rates.get(target)
+        if rate_from is None or rate_to is None:
+            raise CurrencyRateError('Не удалось получить курс для выбранной валюты')
+
+        factor = Decimal(str(rate_from)) / Decimal(str(rate_to))
+        result: list[float | None] = []
+        for value in values:
+            converted = _convert(value, factor)
+            result.append(None if converted is None else float(converted))
+        return result
+
+    def convert_for_owner(
+        self,
+        values: list[float | None],
+        requested: Currency | None,
+        owner_currency: str,
+    ) -> list[float | None]:
+        """Пересчитать суммы из валюты ввода в валюту владельца."""
+        target = owner_currency or Currency.RUB.value
+        source = requested.value if requested is not None else target
+        return self.convert_amounts(values, source, target)
 
     def _vehicle_ids(self, user_id: int) -> list[int]:
         rows = self.db.query(VehicleDB.id).filter(VehicleDB.owner_id == user_id).all()

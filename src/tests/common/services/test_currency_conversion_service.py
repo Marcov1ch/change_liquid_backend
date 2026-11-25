@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.common.enums import ComponentType, TireEventType
+from app.common.enums import ComponentType, Currency, TireEventType
 from app.db.models import (
     Base,
     BrandDB,
@@ -190,6 +190,59 @@ def test_apply_same_currency_does_not_fetch_rates(
     assert result.rate == 1.0
     assert result.records_count == 6
     assert user_with_money.currency == 'RUB'
+
+
+def test_convert_amounts_same_currency_returns_values_without_rates(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = CurrencyConversionService(db_session, _rates_service())
+    monkeypatch.setattr(
+        service.rates,
+        'get_rates',
+        lambda: (_ for _ in ()).throw(RuntimeError('no rates')),
+    )
+
+    assert service.convert_amounts([100.0, None], 'RUB', 'RUB') == [100.0, None]
+
+
+def test_convert_amounts_converts_with_rate(db_session: Session) -> None:
+    service = CurrencyConversionService(db_session, _rates_service())
+
+    assert service.convert_amounts([1000.0], 'RUB', 'USD') == [10.0]
+
+
+def test_convert_amounts_rounds_half_up(db_session: Session) -> None:
+    service = CurrencyConversionService(db_session, _rates_service())
+
+    assert service.convert_amounts([123.456], 'RUB', 'EUR') == [1.03]
+
+
+def test_convert_amounts_raises_when_rate_missing(db_session: Session) -> None:
+    service = CurrencyConversionService(db_session, _rates_service())
+
+    with pytest.raises(ValueError):
+        service.convert_amounts([100.0], 'GBP', 'RUB')
+
+
+def test_convert_for_owner_uses_requested_currency(db_session: Session) -> None:
+    service = CurrencyConversionService(db_session, _rates_service())
+
+    assert service.convert_for_owner([1000.0], Currency.EUR, 'RUB') == [120000.0]
+
+
+def test_convert_for_owner_defaults_to_owner_currency(
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = CurrencyConversionService(db_session, _rates_service())
+    monkeypatch.setattr(
+        service.rates,
+        'get_rates',
+        lambda: (_ for _ in ()).throw(RuntimeError('no rates')),
+    )
+
+    assert service.convert_for_owner([100.0, None], None, 'RUB') == [100.0, None]
 
 
 def test_apply_without_records_does_not_fetch_rates(

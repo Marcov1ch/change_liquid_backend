@@ -10,7 +10,12 @@ from app.api.replacement.schema import (
     UpdateReplacementRequest,
     ReplacementsBulkRequest,
 )
+from app.common.enums import Currency
 from app.db.database import get_db
+from app.services.currency_conversion_service import (
+    CurrencyConversionService,
+    CurrencyRateError,
+)
 from app.services.dto import ReplacementDTO, VehicleDTO
 from app.services.replacement_service import ReplacementService
 from app.services.vehicle_service import VehicleService
@@ -43,7 +48,7 @@ class ReplacementHandler:
             km_traveled=km_traveled,
         )
 
-    async def create_replacements(
+    def create_replacements(
         self,
         request: ReplacementsBulkRequest,
         db: Session = Depends(get_db),
@@ -54,6 +59,36 @@ class ReplacementHandler:
         replacement_service = ReplacementService(db)
 
         try:
+            target_currency = vehicle.owner_currency or Currency.RUB.value
+            source_currency = (
+                request.currency.value
+                if request.currency is not None
+                else target_currency
+            )
+            if source_currency != target_currency:
+                converter = CurrencyConversionService(db)
+                converted_items = []
+                for replacement_request in request.replacements:
+                    component_price, work_price = converter.convert_for_owner(
+                        [
+                            replacement_request.component_price,
+                            replacement_request.work_price,
+                        ],
+                        request.currency,
+                        target_currency,
+                    )
+                    converted_items.append(
+                        replacement_request.model_copy(
+                            update={
+                                'component_price': component_price,
+                                'work_price': work_price,
+                            },
+                        ),
+                    )
+                request = request.model_copy(
+                    update={'replacements': converted_items},
+                )
+
             created = []
             for replacement_request in request.replacements:
                 created.append(replacement_service.create(
@@ -79,6 +114,12 @@ class ReplacementHandler:
                 vehicle.id,
             )
             return results
+        except CurrencyRateError as err:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(err),
+            )
         except ValueError as err:
             db.rollback()
             raise HTTPException(

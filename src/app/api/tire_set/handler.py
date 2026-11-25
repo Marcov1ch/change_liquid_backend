@@ -11,12 +11,17 @@ from app.api.tire_set.schema import (
     TireSetResponse,
     TireSetUpdateRequest,
 )
+from app.common.enums import Currency
 from app.common.middleware import (
     verify_tire_set_access,
     verify_vehicle_access,
     verify_vehicle_view_access,
 )
 from app.db.database import get_db
+from app.services.currency_conversion_service import (
+    CurrencyConversionService,
+    CurrencyRateError,
+)
 from app.services.dto import ReplacementDTO, TireSetDTO, VehicleDTO
 from app.services.tire_set_service import TireSetService
 
@@ -83,7 +88,7 @@ class TireSetHandler:
                 detail='Не удалось получить комплекты шин',
             )
 
-    async def create_tire_set(
+    def create_tire_set(
         self,
         request: TireSetCreateRequest,
         db: Session = Depends(get_db),
@@ -91,9 +96,35 @@ class TireSetHandler:
     ) -> TireSetResponse:
         """Создать комплект шин."""
         try:
+            target_currency = vehicle.owner_currency or Currency.RUB.value
+            source_currency = (
+                request.currency.value
+                if request.currency is not None
+                else target_currency
+            )
+            if source_currency != target_currency:
+                purchase_price, work_price = CurrencyConversionService(
+                    db,
+                ).convert_for_owner(
+                    [request.purchase_price, request.work_price],
+                    request.currency,
+                    target_currency,
+                )
+                request = request.model_copy(
+                    update={
+                        'purchase_price': purchase_price,
+                        'work_price': work_price,
+                    },
+                )
+
             service = TireSetService(db)
             tire_set = service.create(vehicle.id or 0, request, vehicle)
             return self._to_response(tire_set)
+        except CurrencyRateError as err:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(err),
+            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -157,7 +188,7 @@ class TireSetHandler:
                 detail='Не удалось удалить комплект шин',
             )
 
-    async def install_tire_set(
+    def install_tire_set(
         self,
         tire_set_id: int,
         request: TireInstallRequest | None = None,
@@ -166,6 +197,25 @@ class TireSetHandler:
     ) -> TireInstallResponse:
         """Переключить автомобиль на комплект шин."""
         try:
+            if request is not None:
+                target_currency = vehicle.owner_currency or Currency.RUB.value
+                source_currency = (
+                    request.currency.value
+                    if request.currency is not None
+                    else target_currency
+                )
+                if source_currency != target_currency:
+                    (work_price,) = CurrencyConversionService(
+                        db,
+                    ).convert_for_owner(
+                        [request.work_price],
+                        request.currency,
+                        target_currency,
+                    )
+                    request = request.model_copy(
+                        update={'work_price': work_price},
+                    )
+
             service = TireSetService(db)
             tire_set, replacement = service.install(
                 vehicle.id or 0,
@@ -174,6 +224,11 @@ class TireSetHandler:
                 vehicle,
             )
             return self._to_install_response(tire_set, replacement, vehicle)
+        except CurrencyRateError as err:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(err),
+            )
         except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

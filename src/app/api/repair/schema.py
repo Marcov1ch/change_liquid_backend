@@ -2,7 +2,7 @@ from datetime import date
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.common.enums import ComponentType, DATE_BASED_COMPONENT_TYPES
+from app.common.enums import ComponentType, Currency, DATE_BASED_COMPONENT_TYPES
 
 
 def _validate_component_types(component_types: list[ComponentType]) -> list[ComponentType]:
@@ -41,6 +41,11 @@ class RepairCreateRequest(BaseModel):
         ...,
         ge=0,
         description='Стоимость запчастей в валюте пользователя',
+    )
+    currency: Currency | None = Field(
+        None,
+        description='Валюта ввода; по умолчанию — валюта профиля. Используется только при создании',
+        examples=[Currency.EUR.value],
     )
     component_types: list[ComponentType] = Field(
         default_factory=list,

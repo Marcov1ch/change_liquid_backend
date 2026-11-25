@@ -3,7 +3,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, Field, field_validator
 
 from app.api.replacement.schema import ReplacementResponse
-from app.common.enums import TireSeason
+from app.common.enums import Currency, TireSeason
 
 
 class TireSetCreateRequest(BaseModel):
@@ -40,6 +40,11 @@ class TireSetCreateRequest(BaseModel):
         description='Стоимость работ по установке в валюте пользователя',
         examples=[1500.0],
         ge=0,
+    )
+    currency: Currency | None = Field(
+        None,
+        description='Валюта ввода для покупки и работ; по умолчанию — валюта профиля',
+        examples=[Currency.EUR.value],
     )
     next_change_date: date | None = Field(
         None,
@@ -126,6 +131,11 @@ class TireInstallRequest(BaseModel):
         description='Стоимость работ по установке шин в валюте пользователя',
         examples=[1500.0],
         ge=0,
+    )
+    currency: Currency | None = Field(
+        None,
+        description='Валюта ввода; по умолчанию — валюта профиля',
+        examples=[Currency.EUR.value],
     )
 
 
